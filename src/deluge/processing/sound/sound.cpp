@@ -2594,9 +2594,32 @@ void Sound::render(ModelStackWithThreeMainThings* modelStack, std::span<StereoSa
 	int32_t modFXRate = paramFinalValues[params::GLOBAL_MOD_FX_RATE - params::FIRST_GLOBAL];
 
 	processSRRAndBitcrushing(sound_stereo, &postFXVolume, paramManager);
-	processFX(sound_stereo, modFXType_, modFXRate, modFXDepth, delayWorkingState, &postFXVolume, paramManager,
-	          !voices_.empty(), reverbSendAmount >> 1);
+	// Check if ModFX should run after DOTT and stutter
+	bool modFXPostDOTT =
+	    runtimeFeatureSettings.get(RuntimeFeatureSettingType::ModFXPostDOTT) == RuntimeFeatureStateToggle::On;
+	bool dottEnabled = multibandCompressor.isEnabled();
+
+	// Default order: ModFX → Stutter → DOTT → Reverb
+	// With ModFXPostDOTT: Stutter → DOTT → ModFX → Reverb
+	if (!modFXPostDOTT) {
+		processFX(sound_stereo, modFXType_, modFXRate, modFXDepth, delayWorkingState, &postFXVolume, paramManager,
+		          !voices_.empty(), reverbSendAmount >> 1);
+	}
+
 	processStutter(sound_stereo, paramManager);
+
+	// DOTT (multiband compressor) - runs after stutter
+	if (dottEnabled) {
+		applyMultibandCompressorParams(paramManager);
+		multibandCompressor.setMeteringEnabled(true);
+		multibandCompressor.render(sound_stereo);
+	}
+
+	// ModFX after DOTT when setting is ON
+	if (modFXPostDOTT) {
+		processFX(sound_stereo, modFXType_, modFXRate, modFXDepth, delayWorkingState, &postFXVolume, paramManager,
+		          !voices_.empty(), reverbSendAmount >> 1);
+	}
 
 	processReverbSendAndVolume(sound_stereo, reverbBuffer, postFXVolume, postReverbVolume, reverbSendAmount, 0, true);
 

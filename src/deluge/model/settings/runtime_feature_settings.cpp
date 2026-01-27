@@ -204,6 +204,10 @@ void RuntimeFeatureSettings::init() {
 	// Rounded Corners
 	SetupOnOffSetting(settings[RuntimeFeatureSettingType::RoundedCorners], STRING_FOR_COMMUNITY_FEATURE_ROUNDED_CORNERS,
 	                  "roundedCorners", RuntimeFeatureStateToggle::On);
+
+	// ModFX after DOTT (post multiband compressor)
+	SetupOnOffSetting(settings[RuntimeFeatureSettingType::ModFXPostDOTT], STRING_FOR_COMMUNITY_FEATURE_MODFX_POST_DOTT,
+	                  "modFxPostDott", RuntimeFeatureStateToggle::Off);
 }
 
 void RuntimeFeatureSettings::factoryReset(bool showPopup) {
