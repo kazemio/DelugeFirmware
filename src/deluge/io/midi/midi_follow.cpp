@@ -742,6 +742,18 @@ void MidiFollow::midiCCReceived(MIDICable& cable, uint8_t channel, uint8_t ccNum
 		// for these cc's, always use the active clip for the output selected
 		clip = getActiveClip(modelStack);
 		if (clip) {
+			// MIDI/CV arp CC interception: when enabled on this clip, CCs mapped to an arp param control the local
+			// arpeggiator instead of being passed through to the external instrument. The arp is the only internal
+			// param surface a MIDI/CV clip has, so all other CCs still pass through as normal.
+			if ((clip->output->type == OutputType::MIDI_OUT || clip->output->type == OutputType::CV)
+			    && (match == MIDIMatchType::CHANNEL || match == MIDIMatchType::MPE_MASTER)) {
+				ArpeggiatorSettings& arpSettings = ((InstrumentClip*)clip)->arpSettings;
+				if (arpSettings.midiInterceptArp
+				    && arpSettings.trySetArpParamFromMidiCC(ccToSoundParam[ccNumber], ccValue)) {
+					// Consumed by the local arp - don't pass through to the external instrument.
+					return;
+				}
+			}
 			ModelStackWithTimelineCounter* modelStackWithTimelineCounter = modelStack->addTimelineCounter(clip);
 			if (modelStackWithTimelineCounter) {
 				if (clip->output->type == OutputType::KIT) {

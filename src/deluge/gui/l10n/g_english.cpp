@@ -405,6 +405,7 @@ PLACE_SDRAM_DATA Language english{
         {STRING_FOR_REVERSE_PROBABILITY, "Reverse Probability"},
         {STRING_FOR_SEQUENCE_LENGTH, "Sequence Length"},
         {STRING_FOR_INCLUDE_IN_KIT_ARP, "Include in Kit Arp"},
+        {STRING_FOR_ARP_MIDI_INTERCEPT, "Intercept"},
         {STRING_FOR_RANDOMIZER_LOCK, "Lock Randomizer"},
         {STRING_FOR_WALK, "Walk"},
         {STRING_FOR_WALK1, "Walk1"},
