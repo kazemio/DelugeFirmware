@@ -40,6 +40,7 @@
 #include "io/debug/log.h"
 #include "io/midi/midi_device.h"
 #include "io/midi/midi_engine.h"
+#include "io/midi/midi_fanout.h"
 #include "io/midi/midi_follow.h"
 #include "io/midi/midi_transpose.h"
 #include "memory/general_memory_allocator.h"
@@ -2836,6 +2837,10 @@ bool PlaybackHandler::tryGlobalMIDICommands(MIDICable& cable, int32_t channel, i
 				currentSong->loadNextSong();
 				break;
 
+			case GlobalMIDICommand::FAN_OUT:
+				// CCs are handled in midiCCReceived(); a learned note does nothing
+				break;
+
 			// case GlobalMIDICommand::TAP:
 			default:
 				if (getCurrentUI() == getRootUI()) {
@@ -3132,6 +3137,12 @@ void PlaybackHandler::midiCCReceived(MIDICable& cable, uint8_t channel, uint8_t 
 		else if (currentUIMode == UI_MODE_MIDI_LEARN) {
 			view.ccReceivedForMIDILearn(cable, channelOrZone, ccNumber, value);
 			// we don't want this learn to immediately trigger the thing it was learnt to so just return
+			return;
+		}
+		// if learned as the MIDI fan-out source, re-broadcast its value to the configured destination CCs
+		else if (midiEngine.globalMIDICommands[util::to_underlying(GlobalMIDICommand::FAN_OUT)].equalsNoteOrCC(
+		             &cable, channelOrZone + IS_A_CC, ccNumber)) {
+			MIDIFanOut::sendFanOut(value);
 			return;
 		}
 		// check if it was learned to on/off commands (loop, drums, section launch etc.)

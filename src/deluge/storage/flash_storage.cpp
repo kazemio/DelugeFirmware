@@ -22,6 +22,7 @@
 #include "gui/ui/sound_editor.h"
 #include "hid/led/pad_leds.h"
 #include "io/midi/midi_engine.h"
+#include "io/midi/midi_fanout.h"
 #include "io/midi/midi_transpose.h"
 #include "model/scale/preset_scales.h"
 #include "processing/engines/audio_engine.h"
@@ -226,6 +227,10 @@ enum Entries {
 258-261: midiFollow set follow device track 14	product / vendor ids
 262-265: midiFollow set follow device track 15	product / vendor ids
 266-269: midiFollow set follow device track 16	product / vendor ids
+270: GlobalMIDICommand::FAN_OUT channel + 1
+271: GlobalMIDICommand::FAN_OUT noteOrCC + 1
+272-275: GlobalMIDICommand::FAN_OUT product / vendor ids
+276-283: MIDI fan-out destination CCs 1-8, + 1
 */
 
 uint8_t defaultScale;
@@ -328,6 +333,10 @@ void resetSettings() {
 		globalMIDICommand.clear();
 	}
 
+	for (int32_t i = 0; i < MIDIFanOut::kNumDestSlots; i++) {
+		MIDIFanOut::destCC[i] = MIDIFanOut::kDestCCNone;
+	}
+
 	AudioEngine::inputMonitoringMode = InputMonitoringMode::SMART;
 	recordQuantizeLevel = 8;
 
@@ -424,9 +433,14 @@ void resetAutomationSettings() {
 	automationDisableAuditionPadShortcuts = true;
 }
 
+// Settings now extend past 256 bytes (the size of miscStringBuffer, which was previously
+// borrowed for this), so use a dedicated buffer. Bytes never programmed read back as 0xFF.
+constexpr size_t kSettingsBufferSize = 512;
+static uint8_t settingsBuffer[kSettingsBufferSize] __attribute__((aligned(CACHE_LINE_SIZE)));
+
 void readSettings() {
-	std::span buffer{(uint8_t*)miscStringBuffer, kFilenameBufferSize};
-	R_SFLASH_ByteRead(0x80000 - 0x1000, buffer.data(), kFilenameBufferSize, SPIBSC_CH, SPIBSC_CMNCR_BSZ_SINGLE,
+	std::span buffer{settingsBuffer, kSettingsBufferSize};
+	R_SFLASH_ByteRead(0x80000 - 0x1000, buffer.data(), kSettingsBufferSize, SPIBSC_CH, SPIBSC_CMNCR_BSZ_SINGLE,
 	                  SPIBSC_1BIT, SPIBSC_OUTPUT_ADDR_24);
 
 	settingsBeenRead = true;
@@ -832,6 +846,20 @@ void readSettings() {
 	else {
 		defaultPatchCablePolarity = static_cast<Polarity>(buffer[189]);
 	}
+
+	// 0xFF (never-programmed flash) - 1 lands outside the valid channelOrZone range, as does 0 - 1
+	uint8_t fanOutChannel = buffer[270] - 1;
+	if (fanOutChannel >= IS_A_PC + NUM_CHANNELS) {
+		fanOutChannel = MIDI_CHANNEL_NONE;
+	}
+	midiEngine.globalMIDICommands[util::to_underlying(GlobalMIDICommand::FAN_OUT)].channelOrZone = fanOutChannel;
+	midiEngine.globalMIDICommands[util::to_underlying(GlobalMIDICommand::FAN_OUT)].noteOrCC = buffer[271] - 1;
+	MIDIDeviceManager::readDeviceReferenceFromFlash(GlobalMIDICommand::FAN_OUT, &buffer[272]);
+
+	for (int32_t i = 0; i < MIDIFanOut::kNumDestSlots; i++) {
+		uint8_t cc = buffer[276 + i] - 1;
+		MIDIFanOut::destCC[i] = (cc <= MIDIFanOut::kMaxDestCC) ? cc : MIDIFanOut::kDestCCNone;
+	}
 }
 
 static bool areMidiFollowSettingsValid(std::span<uint8_t> buffer) {
@@ -1066,7 +1094,7 @@ static bool areAutomationSettingsValid(std::span<uint8_t> buffer) {
 }
 
 void writeSettings() {
-	std::span<uint8_t> buffer{(uint8_t*)miscStringBuffer, kFilenameBufferSize};
+	std::span<uint8_t> buffer{settingsBuffer, kSettingsBufferSize};
 	std::fill(buffer.begin(), buffer.end(), 0);
 
 	buffer[FIRMWARE_TYPE] = util::to_underlying(FirmwareVersion::current().type());
@@ -1267,9 +1295,17 @@ void writeSettings() {
 
 	buffer[189] = util::to_underlying(defaultPatchCablePolarity);
 
+	buffer[270] = midiEngine.globalMIDICommands[util::to_underlying(GlobalMIDICommand::FAN_OUT)].channelOrZone + 1;
+	buffer[271] = midiEngine.globalMIDICommands[util::to_underlying(GlobalMIDICommand::FAN_OUT)].noteOrCC + 1;
+	MIDIDeviceManager::writeDeviceReferenceToFlash(GlobalMIDICommand::FAN_OUT, &buffer[272]);
+
+	for (int32_t i = 0; i < MIDIFanOut::kNumDestSlots; i++) {
+		buffer[276 + i] = MIDIFanOut::destCC[i] + 1; // unset (255) wraps to 0, reading back as unset
+	}
+
 	R_SFLASH_EraseSector(0x80000 - 0x1000, SPIBSC_CH, SPIBSC_CMNCR_BSZ_SINGLE, 1, SPIBSC_OUTPUT_ADDR_24);
-	R_SFLASH_ByteProgram(0x80000 - 0x1000, buffer.data(), 256, SPIBSC_CH, SPIBSC_CMNCR_BSZ_SINGLE, SPIBSC_1BIT,
-	                     SPIBSC_OUTPUT_ADDR_24);
+	R_SFLASH_ByteProgram(0x80000 - 0x1000, buffer.data(), kSettingsBufferSize, SPIBSC_CH, SPIBSC_CMNCR_BSZ_SINGLE,
+	                     SPIBSC_1BIT, SPIBSC_OUTPUT_ADDR_24);
 }
 
 static void writeMidiFollowSettings(std::span<uint8_t> buffer) {

@@ -999,6 +999,17 @@ PLACE_SDRAM_DATA Language english{
         {STRING_FOR_DEFAULT_HORIZONTAL_MENU, "Horizontal Menu"},
         {STRING_FOR_CHORD_KEYBOARD_MODE_ROW, "Chord Row Mode"},
         {STRING_FOR_CHORD_KEYBOARD_MODE_COLUMN, "Chord Column Mode"},
+        {STRING_FOR_FAN_OUT, "Fan-out"},
+        {STRING_FOR_MIDI_FAN_OUT, "MIDI Fan-Out"},
+        {STRING_FOR_FAN_OUT_SOURCE, "Source"},
+        {STRING_FOR_FAN_OUT_DEST_1, "Destination CC 1"},
+        {STRING_FOR_FAN_OUT_DEST_2, "Destination CC 2"},
+        {STRING_FOR_FAN_OUT_DEST_3, "Destination CC 3"},
+        {STRING_FOR_FAN_OUT_DEST_4, "Destination CC 4"},
+        {STRING_FOR_FAN_OUT_DEST_5, "Destination CC 5"},
+        {STRING_FOR_FAN_OUT_DEST_6, "Destination CC 6"},
+        {STRING_FOR_FAN_OUT_DEST_7, "Destination CC 7"},
+        {STRING_FOR_FAN_OUT_DEST_8, "Destination CC 8"},
     },
 };
 } // namespace deluge::l10n::built_in

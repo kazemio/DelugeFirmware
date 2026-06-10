@@ -99,6 +99,7 @@
 #include "gui/menu_item/midi/device_receive_clock.h"
 #include "gui/menu_item/midi/device_send_clock.h"
 #include "gui/menu_item/midi/devices.h"
+#include "gui/menu_item/midi/fanout_dest.h"
 #include "gui/menu_item/midi/follow/follow_channel.h"
 #include "gui/menu_item/midi/follow/follow_feedback_automation.h"
 #include "gui/menu_item/midi/follow/follow_feedback_channel_type.h"
@@ -1119,6 +1120,23 @@ Submenu midiCommandsMenu{
      &nextSongMidiCommand},
 };
 
+// MIDI fan-out submenu
+midi::Command fanOutSourceMidiCommand{STRING_FOR_FAN_OUT_SOURCE, GlobalMIDICommand::FAN_OUT};
+midi::FanOutDest fanOutDest1{STRING_FOR_FAN_OUT_DEST_1, 0};
+midi::FanOutDest fanOutDest2{STRING_FOR_FAN_OUT_DEST_2, 1};
+midi::FanOutDest fanOutDest3{STRING_FOR_FAN_OUT_DEST_3, 2};
+midi::FanOutDest fanOutDest4{STRING_FOR_FAN_OUT_DEST_4, 3};
+midi::FanOutDest fanOutDest5{STRING_FOR_FAN_OUT_DEST_5, 4};
+midi::FanOutDest fanOutDest6{STRING_FOR_FAN_OUT_DEST_6, 5};
+midi::FanOutDest fanOutDest7{STRING_FOR_FAN_OUT_DEST_7, 6};
+midi::FanOutDest fanOutDest8{STRING_FOR_FAN_OUT_DEST_8, 7};
+Submenu midiFanOutMenu{
+    STRING_FOR_FAN_OUT,
+    STRING_FOR_MIDI_FAN_OUT,
+    {&fanOutSourceMidiCommand, &fanOutDest1, &fanOutDest2, &fanOutDest3, &fanOutDest4, &fanOutDest5, &fanOutDest6,
+     &fanOutDest7, &fanOutDest8},
+};
+
 // MIDI device submenu - for after we've selected which device we want it for
 
 midi::DefaultVelocityToLevel defaultVelocityToLevelMenu{STRING_FOR_VELOCITY};
@@ -1168,6 +1186,7 @@ Submenu midiMenu{
         &midiTransposeMenu,
         &midiTakeoverMenu,
         &midiCommandsMenu,
+        &midiFanOutMenu,
         &midiInputDifferentiationMenu,
         &midi::devicesMenu,
     },
