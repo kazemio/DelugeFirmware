@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Deluge Community Firmware Refactor Roadmap</title>
+<style>
+  :root {
+    --ink: #1d1d1f;
+    --gray: #6e6e73;
+    --light: #d2d2d7;
+    --blue: #0066cc;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif;
+    color: var(--ink);
+    background: #fff;
+    -webkit-font-smoothing: antialiased;
+    font-size: 17px;
+    line-height: 1.6;
+  }
+  .page { width: 100%; margin: 0; padding: 40px 48px 64px; }
+
+  h1 {
+    font-size: 44px;
+    line-height: 1.1;
+    font-weight: 600;
+    letter-spacing: -0.015em;
+    margin-bottom: 20px;
+  }
+  .lede {
+    font-size: 21px;
+    line-height: 1.45;
+    color: var(--gray);
+    font-weight: 400;
+  }
+
+  section { margin-top: 48px; }
+  h2 {
+    font-size: 28px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    margin-bottom: 8px;
+  }
+  .kicker {
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--gray);
+    margin-bottom: 12px;
+  }
+  p.intro { color: var(--gray); margin-bottom: 16px; }
+
+  p + p { margin-top: 10px; }
+
+  .principle { margin: 16px 0; }
+  .principle p { color: var(--gray); }
+  .principle p strong { color: var(--ink); font-weight: 600; }
+
+  ol.vision { list-style: none; counter-reset: v; margin: 16px 0 0; padding: 0; }
+  ol.vision li {
+    counter-increment: v;
+    display: grid;
+    grid-template-columns: minmax(280px, 400px) 1fr;
+    column-gap: 64px;
+    padding: 12px 0;
+    border-top: 1px solid var(--light);
+  }
+  ol.vision h3 { grid-column: 1; grid-row: 1; font-size: 17px; font-weight: 600; }
+  ol.vision h3::before {
+    content: counter(v, decimal-leading-zero);
+    color: var(--gray);
+    font-weight: 400;
+    font-variant-numeric: tabular-nums;
+    margin-right: 12px;
+  }
+  ol.vision p { grid-column: 2; grid-row: 1; color: var(--gray); font-size: 16px; }
+
+  ul.plain { list-style: none; padding: 0; margin-top: 16px; }
+  ul.plain li {
+    display: grid;
+    grid-template-columns: minmax(280px, 400px) 1fr;
+    column-gap: 64px;
+    padding: 12px 0;
+    border-top: 1px solid var(--light);
+    color: var(--gray);
+    font-size: 16px;
+  }
+  ul.plain li strong { grid-column: 1; color: var(--ink); font-weight: 600; font-size: 17px; }
+
+  .pr {
+    display: grid;
+    grid-template-columns: minmax(280px, 400px) 1fr;
+    column-gap: 64px;
+    padding: 10px 0;
+    border-top: 1px solid var(--light);
+  }
+  .pr .pr-title { grid-column: 1; grid-row: 1; }
+  .pr p:not(.pr-title) { grid-column: 2; margin-top: 0; }
+  .pr-title {
+    font-size: 17px;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+  .pr-title .n {
+    color: var(--gray);
+    font-weight: 400;
+    font-variant-numeric: tabular-nums;
+    margin-right: 12px;
+  }
+  .pr-title .tag {
+    font-size: 13px;
+    font-weight: 400;
+    color: var(--blue);
+    margin-left: 10px;
+  }
+  .pr p { font-size: 16px; color: var(--gray); }
+  .pr p.why { margin-top: 2px; }
+  .pr p.why::before { content: "Why — "; color: var(--ink); font-weight: 600; }
+
+  code {
+    font-family: "SF Mono", ui-monospace, Menlo, monospace;
+    font-size: 0.86em;
+    color: inherit;
+  }
+
+</style>
+</head>
+<body>
+<div class="page">
+
+<header>
+  <h1>Deluge Community Firmware Refactor Roadmap</h1>
+  <p class="lede">Forty-five behavior-preserving pull requests that take the Deluge firmware from invariants held in folklore to invariants held in types. The instrument never changes. The code beneath it does.</p>
+</header>
+
+<section>
+  <p class="kicker">The vision</p>
+  <h2>Same machine code. Different codebase.</h2>
+  <p class="intro">The hardware dictates the mechanisms — cooperative scheduling, a stealable sample cache, static allocation. It does not dictate the structure. The end state runs identically on the same chip, but the source gains four properties it lacks today.</p>
+
+  <ol class="vision">
+    <li>
+      <h3>One concurrency boundary</h3>
+      <p>Audio renders at interrupt priority and never blocks. Control code is plain single-threaded logic. The two communicate only through lock-free queues. The current scheme — the audio routine re-entered from inside SD-card waits, across roughly 400 call sites — disappears.</p>
+    </li>
+    <li>
+      <h3>Enforced cache ownership</h3>
+      <p>The stealable sample cache stays; it is what makes the instrument good. But holding sample data now means holding an RAII pin, so use-after-steal becomes impossible to write rather than hard to find.</p>
+    </li>
+    <li>
+      <h3>A model that runs anywhere</h3>
+      <p>Songs, clips, notes, automation, and undo compile and run on a laptop with no hardware headers. Today 43 of 183 model files include GUI or hardware code.</p>
+    </li>
+    <li>
+      <h3>Storage that never waits</h3>
+      <p>No code synchronously blocks on the SD card. Every wait removed deletes a place where the world could change underfoot.</p>
+    </li>
+  </ol>
+</section>
+
+<section>
+  <p class="kicker">The payoff</p>
+  <h2>What the four properties unlock.</h2>
+  <ul class="plain">
+    <li><strong>Refactors become provable.</strong> Golden-master tests catch behavior changes in seconds, in CI, ending the refactor-then-mystery-bug cycle.</li>
+    <li><strong>Bug classes end structurally.</strong> Use-after-steal freezes, re-entrancy corruption, and leaked refcounts become unwritable, not just rare.</li>
+    <li><strong>Contributors move faster.</strong> Model code runs on a laptop in milliseconds instead of flash-and-listen on hardware.</li>
+    <li><strong>Every phase stands alone.</strong> Stopping at any point still leaves the codebase strictly better.</li>
+  </ul>
+</section>
+
+<section>
+  <p class="kicker">The rule</p>
+  <h2>Shippable after every PR.</h2>
+  <div class="principle">
+    <p><strong>The device is fully functional after each individual pull request</strong> — buildable, flashable, behaviorally identical for users. There is never a broken window. New mechanisms are added alongside old ones; call sites migrate one PR at a time; the old mechanism is deleted only when its last user is gone. The two large changes (PRs 41 and 43–44) ship dark behind a build flag.</p>
+    <p>One mechanical transformation per PR, never bundled with an improvement. Each PR is either mechanically equivalent or verified by a golden master built before the change. Ratchet PRs — 15, 30, 36, 42 — make each retired pattern impossible to reintroduce.</p>
+  </div>
+  <p style="color:var(--gray); font-size:16px;">Phases 0–2 can proceed in parallel. Phase 5 depends on 2 and 3; phase 6 depends on 4 and 5.</p>
+</section>
+
+<section>
+  <p class="kicker">Phase 0 · PRs 1–5</p>
+  <h2>Build the net first.</h2>
+  <p class="intro">Past refactors failed because it was difficult to prove behavior preservation. These five PRs change no production code.</p>
+
+  <div class="pr">
+    <p class="pr-title"><span class="n">01</span>Host build for the serialization stack</p>
+    <p>Compile the Serializer and Deserializer in the existing host test build, with an in-memory stand-in for the SD card.</p>
+    <p class="why">First crack in the nothing-runs-off-device wall, proven on the friendliest subsystem.</p>
+  </div>
+  <div class="pr">
+    <p class="pr-title"><span class="n">02</span>Golden-master song round-trips</p>
+    <p>Load a corpus of real songs, write them back, diff the bytes.</p>
+    <p class="why">The cheapest regression net there is — any refactor that changes persisted state fails CI instead of corrupting a song.</p>
+  </div>
+  <div class="pr">
+    <p class="pr-title"><span class="n">03</span>Sequencer replay harness</p>
+    <p>Drive playback with a fake clock and record the emitted note and CC streams as golden files.</p>
+    <p class="why">Catches what byte-diffs cannot: a refactor that moves a note by one tick.</p>
+  </div>
+  <div class="pr">
+    <p class="pr-title"><span class="n">04</span>QEMU input scripts</p>
+    <p>Scripted button and pad presses with assertions on display and LED state, built on the community emulator effort rather than from scratch.</p>
+    <p class="why">The only net that covers UI-layer refactors, which phases 4 and 5 lean on heavily — and the emulator work makes it far cheaper to build.</p>
+  </div>
+  <div class="pr">
+    <p class="pr-title"><span class="n">05</span>Debug assertions</p>
+    <p>An assert macro that freezes with a code on hardware, aborts on host, and compiles out of release builds — plus a re-entrancy depth counter.</p>
+    <p class="why">Turns mysterious corruption later into a clear failure at the violation site.</p>
+  </div>
+</section>
+
+<section>
+  <p class="kicker">Phase 1 · PRs 6–8</p>
+  <h2>Make the invariants visible.</h2>
+  <p class="intro">You cannot safely refactor across invariants you cannot see. Tooling only.</p>
+
+  <div class="pr">
+    <p class="pr-title"><span class="n">06</span>Yield-point map</p>
+    <p>A script that computes every function that may indirectly run the audio routine mid-call, checked in as a report.</p>
+    <p class="why">The invisible invariant behind the heisenbugs becomes a diffable document — and the progress metric for phase 5.</p>
+  </div>
+  <div class="pr">
+    <p class="pr-title"><span class="n">07</span>Yield-map diff in CI</p>
+    <p>Regenerate the map on every PR and surface changes to reviewers.</p>
+    <p class="why">Stops new hazards from entering silently while old ones are drained.</p>
+  </div>
+  <div class="pr">
+    <p class="pr-title"><span class="n">08</span>Yield annotations</p>
+    <p>Generated doc comments on every function in the map.</p>
+    <p class="why">Puts the danger at the call site, where decisions are made — not in a report nobody opens.</p>
+  </div>
+</section>
+
+<section>
+  <p class="kicker">Phase 2 · PRs 9–16</p>
+  <h2>Pin the sample cache.</h2>
+  <p class="intro">About seventy manual refcount call sites become compiler-enforced ownership — <strong>the most bugs retired per line available anywhere in the codebase</strong>.</p>
+
+  <div class="pr">
+    <p class="pr-title"><span class="n">09</span>Introduce <code>ClusterPin</code></p>
+    <p>A move-only RAII handle whose constructor and destructor call the existing <code>addReason</code> and <code>removeReason</code> verbatim. No call sites converted yet.</p>
+    <p class="why">Identical behavior by construction; establishes the vocabulary every conversion uses.</p>
+  </div>
+  <div class="pr">
+    <p class="pr-title"><span class="n">10</span>Convert <code>cluster.cpp</code> and <code>audio_file.cpp</code></p>
+    <p class="why">Start at the mechanism's home, with the smallest blast radius.</p>
+  </div>
+  <div class="pr">
+    <p class="pr-title"><span class="n">11</span>Convert <code>audio_file_manager.cpp</code></p>
+    <p class="why">The largest cluster-juggling file; the most leak opportunities retired in one review.</p>
+  </div>
+  <div class="pr">
+    <p class="pr-title"><span class="n">12</span>Convert <code>audio_file_holder</code> and <code>wave_table</code></p>
+    <p class="why">Clears the storage side, leaving only GUI and playback.</p>
+  </div>
+  <div class="pr">
+    <p class="pr-title"><span class="n">13</span>Convert the sample browser and waveform renderer</p>
+    <p class="why">GUI-side holders are where pins outlive UI state — historically fertile ground for leaks.</p>
+  </div>
+  <div class="pr">
+    <p class="pr-title"><span class="n">14</span>Convert the playback path</p>
+    <p>The low-level sample reader and voice unassignment.</p>
+    <p class="why">The sites where a stale pointer means audible corruption under load.</p>
+  </div>
+  <div class="pr">
+    <p class="pr-title"><span class="n">15</span>Privatize the raw refcount<span class="tag">Ratchet</span></p>
+    <p class="why">The compiler now enforces the invariant forever; manual refcounting cannot return.</p>
+  </div>
+  <div class="pr">
+    <p class="pr-title"><span class="n">16</span>Pin-leak detector</p>
+    <p>Debug-build assert that reason counts match outstanding pins at destruction or steal.</p>
+    <p class="why">Any conversion mistake surfaces at the violation site, before users find it.</p>
+  </div>
+</section>
+
+<section>
+  <p class="kicker">Phase 3 · PRs 17–30</p>
+  <h2>Free the model from the hardware.</h2>
+  <p class="intro">Forty-three model files include GUI or hardware headers. Each PR cuts a cluster of them loose; the count of host-compilable files only goes up, and the golden masters prove nothing changed.</p>
+
+  <div class="pr">
+    <p class="pr-title"><span class="n">17</span>A <code>reportFatalError()</code> function</p>
+    <p>Replaces direct display-freeze calls throughout the model; the hardware build delegates to the display as before.</p>
+    <p class="why">Removes the single most common reason model files include hardware headers.</p>
+  </div>
+  <div class="pr">
+    <p class="pr-title"><span class="n">18</span>A narrow UI-notification interface</p>
+    <p>The model's tell-the-UI calls go through a small interface; hardware forwards to today's globals, the host records calls for tests.</p>
+    <p class="why">Severs the model-to-GUI direction once, so the next eleven PRs become mostly include deletions.</p>
+  </div>
+  <div class="pr">
+    <p class="pr-title"><span class="n">19</span>Cut <code>display.h</code> from <code>model_stack.h</code></p>
+    <p class="why">The highest-fan-out include in the model; one deletion uncouples every ModelStack user.</p>
+  </div>
+  <div class="pr">
+    <p class="pr-title"><span class="n">20</span>Split runtime feature settings</p>
+    <p>Storage and lookup stay in the model; the menu moves to the GUI.</p>
+    <p class="why">Flags are read everywhere; the split lets host tests exercise flag-dependent behavior.</p>
+  </div>
+  <div class="pr">
+    <p class="pr-title"><span class="n">21</span>Move the clip minders to <code>gui/</code></p>
+    <p>A pure file move, no edits.</p>
+    <p class="why">They are UI logic misfiled in the model; relocating them shrinks the work without touching a line.</p>
+  </div>
+  <div class="pr">
+    <p class="pr-title"><span class="n">22</span>Decouple notes</p>
+    <p class="why">Note rows hold the most test-worthy logic in the firmware — quantize, nudge, MPE.</p>
+  </div>
+  <div class="pr">
+    <p class="pr-title"><span class="n">23</span>Decouple clips, part one</p>
+    <p>The clip base class, audio clips, and clip instances.</p>
+    <p class="why">Clears the base layer so the hardest file becomes an isolated effort.</p>
+  </div>
+  <div class="pr">
+    <p class="pr-title"><span class="n">24</span>Decouple clips, part two</p>
+    <p><code>instrument_clip.cpp</code> — 4,700 lines, the worst file in the phase.</p>
+    <p class="why">Once host-compilable, the replay harness covers real clip logic.</p>
+  </div>
+  <div class="pr">
+    <p class="pr-title"><span class="n">25</span>Decouple the song</p>
+    <p class="why">The 6,100-line centerpiece becomes host-testable; round-trip tests now exercise the true load and save path.</p>
+  </div>
+  <div class="pr">
+    <p class="pr-title"><span class="n">26</span>Decouple instruments</p>
+    <p>Kits, melodic and MIDI instruments, drums, outputs.</p>
+    <p class="why">Brings MIDI and CV behavior under host test — where community features concentrate.</p>
+  </div>
+  <div class="pr">
+    <p class="pr-title"><span class="n">27</span>Decouple samples</p>
+    <p>Holders, the low-level reader, the recorder.</p>
+    <p class="why">A prerequisite for phase 5: code being made asynchronous must be testable first.</p>
+  </div>
+  <div class="pr">
+    <p class="pr-title"><span class="n">28</span>Decouple undo</p>
+    <p>The consequence system and action logger.</p>
+    <p class="why">Undo bugs are catastrophic and currently untestable; do–undo round-trips become host tests.</p>
+  </div>
+  <div class="pr">
+    <p class="pr-title"><span class="n">29</span>Decouple the remainder</p>
+    <p>Mod-controllables, global effects, voices, sync.</p>
+    <p class="why">Completes the sweep so the gate can defend the whole territory.</p>
+  </div>
+  <div class="pr">
+    <p class="pr-title"><span class="n">30</span>CI gate on the model<span class="tag">Ratchet</span></p>
+    <p>The count of host-compilable model files may never decrease.</p>
+    <p class="why">Turns the phase's outcome from a current state into a permanent property.</p>
+  </div>
+</section>
+
+<section>
+  <p class="kicker">Phase 4 · PRs 31–36</p>
+  <h2>One way to defer.</h2>
+  <p class="intro">There are 169 hand-rolled instances of "do this outside the card routine." Funnel them through one tested queue, so the endgame has a single choke point instead of 169.</p>
+
+  <div class="pr">
+    <p class="pr-title"><span class="n">31</span>Introduce a deferred-actions queue</p>
+    <p>Bounded callbacks drained from the main loop, unit-tested on the host.</p>
+    <p class="why">One tested mechanism replaces 169 hand-rolled copies of the same idea.</p>
+  </div>
+  <div class="pr">
+    <p class="pr-title"><span class="n">32</span>Convert the session and arranger views</p>
+    <p class="why">The most timing-sensitive deferral users; proving the queue under the hardest load first.</p>
+  </div>
+  <div class="pr">
+    <p class="pr-title"><span class="n">33</span>Convert the clip and automation views</p>
+    <p class="why">The two largest view files; the bulk of remaining sites.</p>
+  </div>
+  <div class="pr">
+    <p class="pr-title"><span class="n">34</span>Convert browsers, menus, load and save</p>
+    <p class="why">These sites interleave with SD access — exactly where deferral mistakes corrupt state today.</p>
+  </div>
+  <div class="pr">
+    <p class="pr-title"><span class="n">35</span>Convert the global handlers</p>
+    <p>Buttons, mod wheel, MIDI learn.</p>
+    <p class="why">Sweeps the long tail so the pattern can be deleted.</p>
+  </div>
+  <div class="pr">
+    <p class="pr-title"><span class="n">36</span>Delete the old pattern<span class="tag">Ratchet</span></p>
+    <p>Remove <code>REMIND_ME_OUTSIDE_CARD_ROUTINE</code> and its plumbing.</p>
+    <p class="why">The ad-hoc pattern becomes unexpressible; all deferred mutation flows through one auditable funnel.</p>
+  </div>
+</section>
+
+<section>
+  <p class="kicker">Phase 5 · PRs 37–42</p>
+  <h2>Stop waiting on the card.</h2>
+  <p class="intro">Every synchronous SD wait is a place where the world can change underfoot. Convert leaf-first; the yield map shrinking to zero is the acceptance proof.</p>
+
+  <div class="pr">
+    <p class="pr-title"><span class="n">37</span>Async SD request API</p>
+    <p>Issue, poll, complete — added alongside the synchronous path, with no callers yet.</p>
+    <p class="why">Additive and risk-free; establishes the pattern every conversion follows.</p>
+  </div>
+  <div class="pr">
+    <p class="pr-title"><span class="n">38</span>Convert sample preview</p>
+    <p class="why">The lowest-stakes SD path — a mistake mis-previews a sample rather than corrupting playback. The right place to learn.</p>
+  </div>
+  <div class="pr">
+    <p class="pr-title"><span class="n">39</span>Convert waveform rendering</p>
+    <p class="why">Removes yield points inside UI rendering, where re-entrancy is least expected.</p>
+  </div>
+  <div class="pr">
+    <p class="pr-title"><span class="n">40</span>Convert metadata reads</p>
+    <p>Browser columns and sample-length scans.</p>
+    <p class="why">After this, only the streaming core still waits.</p>
+  </div>
+  <div class="pr">
+    <p class="pr-title"><span class="n">41</span>Convert the streaming prefetcher<span class="tag">Build-flagged</span></p>
+    <p>The sample-streaming core becomes an async state machine; the old path stays default until soaked.</p>
+    <p class="why">The big one — the core reason audio must be hand-cranked during waits. Gated on phases 2 and 3.</p>
+  </div>
+  <div class="pr">
+    <p class="pr-title"><span class="n">42</span>Remove the yield calls<span class="tag">Ratchet</span></p>
+    <p>Delete <code>routineForSD()</code> from each converted subsystem.</p>
+    <p class="why">The yield map shrinks toward empty; each removal permanently deletes a class of bugs.</p>
+  </div>
+</section>
+
+<section>
+  <p class="kicker">Phase 6 · PRs 43–45</p>
+  <h2>Invert the engine.</h2>
+  <p class="intro">After phases 4 and 5, mutations are funneled and yield points are gone. Moving audio to interrupt priority becomes a small change to a prepared codebase, not a heart transplant.</p>
+
+  <div class="pr">
+    <p class="pr-title"><span class="n">43</span>Audio from the DMA interrupt<span class="tag">Build-flagged</span></p>
+    <p>Render at interrupt priority behind a build flag; main-loop cranking stays the default.</p>
+    <p class="why">Proves the inversion empirically with zero risk to release users.</p>
+  </div>
+  <div class="pr">
+    <p class="pr-title"><span class="n">44</span>The command queue<span class="tag">Build-flagged</span></p>
+    <p>A lock-free queue at the control–audio boundary; debug asserts verify no direct cross-boundary writes remain.</p>
+    <p class="why">Establishes the single explicit boundary of the vision; control code becomes plain single-threaded logic.</p>
+  </div>
+  <div class="pr">
+    <p class="pr-title"><span class="n">45</span>Flip the default</p>
+    <p>After a community-beta soak, delete the legacy scheduling path.</p>
+    <p class="why">Audio that cannot glitch on SD latency — and a concurrency story that fits in one paragraph.</p>
+  </div>
+</section>
+
+<section>
+  <p class="kicker">Priorities</p>
+  <h2>Not all 45 carry equal weight.</h2>
+  <p class="intro">An honest accounting: the value is unevenly distributed, and the scarce resource in a volunteer project is maintainer review, not authorship. The tiers below are how this roadmap should be read — the first tier is the actual proposal; the rest is direction.</p>
+  <ul class="plain">
+    <li><strong>Do first — phases 0 and 2.</strong> Thirteen PRs, high confidence. The verification net and cluster pins retire bugs the community actually hits — corrupted songs, reason-count freezes — are cheap to review, and stand alone. Roughly a fifth of the effort for most of the risk-adjusted value.</li>
+    <li><strong>Do incrementally — phase 3.</strong> The biggest enabler in the plan, and heavier than it looks: perhaps a third of the 43 files hide real design decisions, not mechanical include-deletions. Pursue file by file, as review bandwidth allows.</li>
+    <li><strong>Decide later — phases 4 through 6.</strong> Architecturally right and practically optional. "The inversion becomes small after phases 4 and 5" is a design thesis, not a demonstrated fact — and the current scheduling demonstrably ships. Commit only once the earlier tiers have proven out.</li>
+    <li><strong>One known caveat.</strong> The sequencer replay harness (PR 3) likely depends on phase 3 decoupling to run on a laptop; it may need to start life in the QEMU emulator and move to the host later.</li>
+  </ul>
+</section>
+
+<section>
+  <p class="kicker">Verification</p>
+  <h2>How each phase proves itself.</h2>
+  <ul class="plain">
+    <li><strong>Phases 0–1.</strong> No production changes; the new harnesses and scripts simply run in CI.</li>
+    <li><strong>Phase 2.</strong> Golden masters and the QEMU smoke test green on every PR; the leak detector validates conversions on hardware.</li>
+    <li><strong>Phase 3.</strong> Byte-identical round-trips and identical event streams on every PR; the host-compilable file count only rises.</li>
+    <li><strong>Phases 4–5.</strong> QEMU scripts cover UI behavior; the yield-map diff documents each shrink; debug builds assert through beta.</li>
+    <li><strong>Phase 6.</strong> A/B builds on hardware, audio-output diffs under scripted load, and a community soak before the flip.</li>
+  </ul>
+</section>
+
+<section>
+  <p class="kicker">Outcome</p>
+  <h2>The same instrument, on a codebase that can be changed with proof instead of courage.</h2>
+  <p class="intro">Nothing about the Deluge itself changes — same sound, same workflow, same hardware. What changes is everything around it: the freeze and corruption bugs that came from stolen memory and re-entrant timing are structurally impossible rather than merely rare; the model runs and is tested on a laptop in milliseconds instead of flash-and-listen on hardware; audio cannot glitch on SD latency; and the concurrency story fits in one paragraph instead of in the heads of a few veterans. A contributor's change is proven safe by CI before it ships — which is the difference between a codebase the community maintains and one it merely survives.</p>
+</section>
+
+<section>
+  <p class="kicker">Related work</p>
+  <h2>Alongside the emulator.</h2>
+  <p class="intro">A community QEMU-based Deluge emulator is already in progress, and this roadmap is designed to compound with it rather than duplicate it. The emulator answers <em>how do I run the firmware without hardware</em>; this work answers <em>how do I prove a change is safe, and how do bug classes become impossible to write</em>. The two meet in the middle: the emulator gives the roadmap a cheap home for scripted regression specs (PR 4) and a soak venue for the build-flagged changes in phases 5 and 6, while the roadmap gives the emulator something an emulator alone can never provide — millisecond unit tests that pinpoint the failing line, and structural guarantees that don't depend on reproducing timing. The one thing emulation cannot do is recreate real SD latency and memory pressure, which is where the heisenbugs live — so golden masters, the host-runnable model, and a final hardware soak remain essential even in a fully emulated world.</p>
+  <p class="intro">One practical step before phase 0 begins: coordinate with the emulator's authors. If their device model exposes a scripting hook for input injection and display readback, PR 4 shrinks to glue code.</p>
+</section>
+
+</div>
+</body>
+</html>
