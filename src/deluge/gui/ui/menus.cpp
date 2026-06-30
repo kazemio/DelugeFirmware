@@ -5,6 +5,7 @@
 #include "gui/menu_item/arpeggiator/chord_type.h"
 #include "gui/menu_item/arpeggiator/include_in_kit_arp.h"
 #include "gui/menu_item/arpeggiator/midi_cv/gate.h"
+#include "gui/menu_item/arpeggiator/midi_cv/midi_intercept.h"
 #include "gui/menu_item/arpeggiator/midi_cv/rate.h"
 #include "gui/menu_item/arpeggiator/midi_cv/rhythm.h"
 #include "gui/menu_item/arpeggiator/midi_cv/sequence_length.h"
@@ -278,6 +279,9 @@ arpeggiator::midi_cv::SequenceLength arpSequenceLengthMenuMIDIOrCV{STRING_FOR_SE
 
 arpeggiator::IncludeInKitArp arpIncludeInKitArpMenu{STRING_FOR_INCLUDE_IN_KIT_ARP, STRING_FOR_INCLUDE_IN_KIT_ARP};
 
+// MIDI/CV only: intercept arp-mapped MIDI-follow CCs to control the local arp instead of passing them through
+arpeggiator::midi_cv::MidiIntercept arpMidiInterceptMenu{STRING_FOR_ARP_MIDI_INTERCEPT, STRING_FOR_ARP_MIDI_INTERCEPT};
+
 // Randomizer ---------------------------------
 randomizer::RandomizerLock randomizerLockMenu{STRING_FOR_RANDOMIZER_LOCK, STRING_FOR_ARP_RANDOMIZER_LOCK_TITLE};
 randomizer::RandomizerUnpatchedParam spreadGateMenu{STRING_FOR_SPREAD_GATE, STRING_FOR_ARP_SPREAD_GATE_MENU_TITLE,
@@ -413,6 +417,8 @@ Submenu arpMenuMIDIOrCV{
         &arpPatternMenu,
         // MPE
         &arpMpeMenu,
+        // MIDI/CV only: route arp-mapped CCs to the local arp instead of passing through
+        &arpMidiInterceptMenu,
         // Include in kit arp
         &arpIncludeInKitArpMenu,
     },
