@@ -404,6 +404,10 @@ bool MIDIInstrument::writeDataToFile(Serializer& writer, Clip* clipForSavingOutp
 		writer.closeTag();
 
 		writeDeviceDefinitionFile(writer, true);
+
+		if (macrosEnabled || MIDIMacro::anyMacroConfigured(macros)) {
+			MIDIMacro::writeMacrosToFile(writer, macros, macrosEnabled);
+		}
 	}
 	else {
 		if (!clipForSavingOutputOnly && !midiInput.containsSomething()) {
@@ -516,6 +520,10 @@ bool MIDIInstrument::readTagFromFile(Deserializer& reader, char const* tagName) 
 	}
 	else if (!strcmp(tagName, "midiDevice")) {
 		readDeviceDefinitionFile(reader, true);
+	}
+	else if (!strcmp(tagName, "midiMacros")) {
+		MIDIMacro::readMacrosFromFile(reader, macros, macrosEnabled);
+		editedByUser = true;
 	}
 	else if (NonAudioInstrument::readTagFromFile(reader, tagName)) {
 		return true;
