@@ -205,9 +205,9 @@ void RuntimeFeatureSettings::init() {
 	SetupOnOffSetting(settings[RuntimeFeatureSettingType::RoundedCorners], STRING_FOR_COMMUNITY_FEATURE_ROUNDED_CORNERS,
 	                  "roundedCorners", RuntimeFeatureStateToggle::On);
 
-	// MIDI Macro
-	SetupOnOffSetting(settings[RuntimeFeatureSettingType::MidiMacro], STRING_FOR_COMMUNITY_FEATURE_MIDI_MACRO,
-	                  "midiMacro", RuntimeFeatureStateToggle::Off);
+	// macro
+	SetupOnOffSetting(settings[RuntimeFeatureSettingType::MacroSystem], STRING_FOR_COMMUNITY_FEATURE_MACROS, "macros",
+	                  RuntimeFeatureStateToggle::Off);
 }
 
 void RuntimeFeatureSettings::factoryReset(bool showPopup) {

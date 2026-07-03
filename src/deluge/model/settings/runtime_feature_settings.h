@@ -67,7 +67,7 @@ enum RuntimeFeatureSettingType : uint32_t {
 	TrimFromStartOfAudioClip,
 	ShowBatteryLevel,
 	RoundedCorners,
-	MidiMacro,
+	MacroSystem,
 	MaxElement // Keep as boundary
 };
 
