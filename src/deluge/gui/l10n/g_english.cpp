@@ -1060,9 +1060,8 @@ PLACE_SDRAM_DATA Language english{
         {STRING_FOR_MACRO_SAVE, "Save Preset"},
         {STRING_FOR_MACRO_PRESET_LOADED, "Preset loaded"},
         {STRING_FOR_MACRO_PRESET_SAVED, "Preset saved"},
-        {STRING_FOR_MACRO_CAPTURE_A, "Capture A"},
-        {STRING_FOR_MACRO_CAPTURE_B, "Capture B"},
-        {STRING_FOR_MACRO_CC_IN_USE, "CC in use"},
+        {STRING_FOR_MACRO_CAPTURE_FROM, "Capture From"},
+        {STRING_FOR_MACRO_CAPTURE_TO, "Capture To"},
         {STRING_FOR_MACRO_USED_BY, "used by"},
 >>>>>>> 868b3a001 (Add MIDI Macro automation lanes in automation view)
     },
