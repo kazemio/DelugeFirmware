@@ -1605,6 +1605,7 @@ PLACE_SDRAM_BSS Submenu soundEditorRootMenu{
         &bendMenu,
         &drumBendRangeMenu,
         &patchCablesMenu,
+        &macrosMenu,
         &sequenceDirectionMenu,
         &outputMidiSubmenu,
     },
