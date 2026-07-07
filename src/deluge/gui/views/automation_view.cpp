@@ -2750,7 +2750,7 @@ void AutomationView::openMacroLaneEditor(Clip* clip, int32_t macroIndex) {
 		clip->lastSelectedParamID = params::UNPATCHED_MACRO_1 + macroIndex;
 		clip->lastSelectedParamArrayPosition = macroIndex;
 	}
-	else if (clip->output->type == OutputType::AUDIO) { // GLOBAL domain (audio clip)
+	else if (Macros::domainForOutput(clip->output) == Macros::Domain::GLOBAL) { // audio clip or kit affect-entire
 		clip->lastSelectedParamKind = params::Kind::UNPATCHED_GLOBAL;
 		clip->lastSelectedParamID = params::UNPATCHED_GLOBAL_MACRO_1 + macroIndex;
 		clip->lastSelectedParamArrayPosition = macroIndex; // lanes are the first four globalParamsForAutomation entries
@@ -3171,9 +3171,10 @@ void AutomationView::selectGlobalParam(int32_t offset, Clip* clip) {
 		auto idx = getNextSelectedParamArrayPosition(offset, clip->lastSelectedParamArrayPosition,
 		                                             kNumGlobalParamsForAutomation);
 		auto [kind, id] = globalParamsForAutomation[idx];
-		// Kit affect-entire doesn't host macros (kit-global macros are a later phase), so its four macro
-		// lanes (list entries 0-3) are skipped in the param scroll.
-		while (id >= params::UNPATCHED_GLOBAL_MACRO_1 && id <= params::UNPATCHED_GLOBAL_MACRO_4) {
+		// Kit affect-entire hosts macros; its four macro lanes (list entries 0-3) stay scrollable when the
+		// feature is on and are skipped only when it's off, mirroring synth and audio clips.
+		while ((id >= params::UNPATCHED_GLOBAL_MACRO_1 && id <= params::UNPATCHED_GLOBAL_MACRO_4)
+		       && !Macros::isEnabled()) {
 			if (offset < 0) {
 				offset -= 1;
 			}
