@@ -789,7 +789,7 @@ doCancelPopup:
 		// SHIFT + Y_ENC toggles the gold-knob MACRO mode (synth/MIDI clips only). Only when idle - so
 		// it never shadows the note-repeat / euclidean gestures that use Y_ENC while notes are held.
 		if (on && Buttons::isShiftButtonPressed() && currentUIMode == UI_MODE_NONE && Macros::isEnabled()
-		    && Macros::macroClipInstrument(getCurrentClip()) != nullptr) {
+		    && Macros::macroHost(getCurrentClip()) != nullptr) {
 			view.toggleMacroKnobMode();
 			return ActionResult::DEALT_WITH;
 		}
@@ -7384,7 +7384,7 @@ void InstrumentClipView::pulseMacroTargetPicker() {
 void InstrumentClipView::renderMacroTargetPickerOverlay(RGB image[][kDisplayWidth + kSideBarWidth],
                                                         uint8_t occupancyMask[][kDisplayWidth + kSideBarWidth]) {
 	Clip* clip = getCurrentClip();
-	MelodicInstrument* instrument = Macros::macroClipInstrument(clip);
+	Output* instrument = Macros::macroHost(clip);
 	if (instrument == nullptr || macroTargetPickerMacro < 0) {
 		return;
 	}
@@ -7435,7 +7435,7 @@ void InstrumentClipView::renderMacroTargetPickerOverlay(RGB image[][kDisplayWidt
 // (SHIFT+DELETE then removes exactly the layer you see; a plain tap still cycles on release).
 void InstrumentClipView::handleMacroTargetPickerPad(int32_t x, int32_t y, int32_t velocity) {
 	Clip* clip = getCurrentClip();
-	MelodicInstrument* instrument = Macros::macroClipInstrument(clip);
+	Output* instrument = Macros::macroHost(clip);
 	if (instrument == nullptr || macroTargetPickerMacro < 0) {
 		return;
 	}
@@ -7526,7 +7526,7 @@ void InstrumentClipView::handleMacroTargetPickerPad(int32_t x, int32_t y, int32_
 
 // Assigns `destination` to the macro's next free target slot and selects it, or shows MACRO SLOTS FULL.
 void InstrumentClipView::addMacroPickerLayer(Clip* clip, int32_t x, int32_t y, int32_t destination, bool addingSecond) {
-	MelodicInstrument* instrument = Macros::macroClipInstrument(clip);
+	Output* instrument = Macros::macroHost(clip);
 	if (instrument == nullptr) {
 		return;
 	}
@@ -7558,7 +7558,7 @@ void InstrumentClipView::showSelectedMacroPickerTargetReadout() {
 	if (macroTargetPickerLastSlot < 0 || macroTargetPickerMacro < 0) {
 		return;
 	}
-	MelodicInstrument* instrument = Macros::macroClipInstrument(getCurrentClip());
+	Output* instrument = Macros::macroHost(getCurrentClip());
 	if (instrument == nullptr) {
 		return;
 	}
@@ -7572,7 +7572,7 @@ void InstrumentClipView::deleteSelectedMacroTarget() {
 		return; // nothing selected yet
 	}
 	Clip* clip = getCurrentClip();
-	MelodicInstrument* instrument = Macros::macroClipInstrument(clip);
+	Output* instrument = Macros::macroHost(clip);
 	if (instrument == nullptr) {
 		return;
 	}
@@ -7616,7 +7616,7 @@ void InstrumentClipView::deleteSelectedMacroTarget() {
 // same re-bake, same "destination name / From - To" readout and knob-ring feedback.
 void InstrumentClipView::handleMacroPickerModEncoder(int32_t whichModEncoder, int32_t offset) {
 	Clip* clip = getCurrentClip();
-	MelodicInstrument* instrument = Macros::macroClipInstrument(clip);
+	Output* instrument = Macros::macroHost(clip);
 	if (instrument == nullptr || macroTargetPickerMacro < 0 || macroTargetPickerLastSlot < 0) {
 		return;
 	}
