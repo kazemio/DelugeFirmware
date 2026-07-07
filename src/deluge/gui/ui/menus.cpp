@@ -1803,6 +1803,7 @@ PLACE_SDRAM_BSS menu_item::Submenu soundEditorRootMenuAudioClip{
         &globalFiltersMenu,
         &audioClipFXMenu,
         &globalSidechainMenu,
+        &macrosMenu,
         &audioClipSampleMenu,
         &audioClipAttackMenu,
         &priorityMenu,
