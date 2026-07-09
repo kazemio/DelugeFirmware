@@ -39,9 +39,10 @@ class Clip;
 class MacroAssignOverlay {
 public:
 	bool active() const { return heldMacro_ >= 0; }
-	// True once a target slot has been selected by a tap: the gold knobs then shape that target's
-	// From/To (knob 0 = From, knob 1 = To) instead of driving the whole macro.
-	bool editingTarget() const { return active() && lastSlot_ >= 0; }
+	// True once a target slot has been selected by a tap, or an encoder pick is pending: the gold
+	// knobs then shape that target's From/To (knob 0 = From, knob 1 = To) instead of driving the
+	// whole macro.
+	bool editingTarget() const { return active() && (lastSlot_ >= 0 || pendingPosition_ >= 0); }
 
 	void open(int32_t macroIndex);
 	void close();
@@ -63,6 +64,11 @@ private:
 	void addLayer(Clip* clip, int32_t x, int32_t y, int32_t destination, bool addingSecond);
 	// The destination byte pendingPosition_ points at, or -1 for none.
 	int32_t pendingDestination() const;
+	// The macro's first free target slot, or -1 when all 8 are taken. While a pending pick is dialed,
+	// this slot is BORROWED as the pick's staging slot: the range readout / knob rings show its From/To
+	// and the gold knobs shape them, so commit (which keeps a slot's existing range) lands exactly what
+	// was previewed - the same UI as the macro-lane quick-edit, on the slot the pick will occupy.
+	int32_t firstFreeSlot() const;
 	// Adds the encoder's pending pick to the next free slot on hold end (called from close()).
 	void commitPendingDestination();
 	// Shows the selected target's range readout + knob rings on tap / selection change.
