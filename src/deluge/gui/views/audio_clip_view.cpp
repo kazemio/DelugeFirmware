@@ -763,6 +763,12 @@ void AudioClipView::sampleNeedsReRendering(Sample* s) {
 }
 
 void AudioClipView::selectEncoderAction(int8_t offset) {
+	// While a macro button is held (target picker up), the select encoder dials a destination to add -
+	// reaching params that have no shortcut pad; committed on release.
+	if (macroAssignOverlay.active()) {
+		macroAssignOverlay.handleSelectEncoder(offset);
+		return;
+	}
 	if (currentUIMode) {
 		return;
 	}

@@ -51,14 +51,26 @@ public:
 	                   uint8_t occupancyMask[][kDisplayWidth + kSideBarWidth]);
 	void handlePad(int32_t x, int32_t y, int32_t velocity);
 	void handleModEncoder(int32_t whichModEncoder, int32_t offset);
+	// Select-encoder turns dial a PENDING destination through the domain's whole destination space -
+	// including destinations with no shortcut pad (most MIDI CCs) and cascade ids. Committed to the
+	// next free slot when the hold ends (see close()); dial back below the first position to cancel.
+	void handleSelectEncoder(int32_t offset);
 	void deleteSelectedTarget(); // SHIFT+SAVE: remove the selected pad's assignment (pad reverts to grey)
 
 private:
 	// Assigns `destination` to the macro's next free target slot and selects it (or shows MACRO SLOTS
 	// FULL). Used for both the grey-pad assign and the build-up add of a second shortcut layer.
 	void addLayer(Clip* clip, int32_t x, int32_t y, int32_t destination, bool addingSecond);
+	// The destination byte pendingPosition_ points at, or -1 for none.
+	int32_t pendingDestination() const;
+	// Adds the encoder's pending pick to the next free slot on hold end (called from close()).
+	void commitPendingDestination();
 	// Shows the selected target's range readout + knob rings on tap / selection change.
 	void showReadout();
+
+	// The encoder-dialed pending pick as a position in the destination dial space, or -1 for none.
+	// The destination byte itself is domain-ambiguous, so the position is resolved on use.
+	int32_t pendingPosition_ = -1;
 
 	int8_t heldMacro_ = -1; // held macro (0..kNumMacros-1), or -1 when the picker is inactive
 	int8_t lastX_ = -1;
