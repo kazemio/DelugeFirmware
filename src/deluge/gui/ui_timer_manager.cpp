@@ -21,7 +21,7 @@
 #include "gui/ui/sound_editor.h"
 #include "gui/views/automation_view.h"
 #include "gui/views/instrument_clip_view.h"
-#include "gui/views/macro_assign_overlay.h"
+#include "gui/views/macro_target_assign_overlay.h"
 #include "gui/views/performance_view.h"
 #include "gui/views/session_view.h"
 #include "gui/views/view.h"
@@ -137,8 +137,8 @@ void UITimerManager::routine() {
 					automationView.blinkPadSelectionShortcut();
 					break;
 
-				case TimerName::MACRO_ASSIGN_OVERLAY_PULSE:
-					macroAssignOverlay.pulse();
+				case TimerName::MACRO_TARGET_ASSIGN_PULSE:
+					macroTargetAssignOverlay.pulse();
 					break;
 
 				case TimerName::NOTE_ROW_BLINK:
