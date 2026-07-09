@@ -166,7 +166,7 @@ void MacroAssignOverlay::handleSelectEncoder(int32_t offset) {
 		// pick cancelled: give the staging slot its pristine range back (any gold-knob shaping was
 		// for this pick only) and drop back to the idle hold readout / macro knob rings
 		macro.targets[freeSlot] = Macros::MacroTargetSlot{};
-		display->popupText("Macro Assign");
+		display->popupText("Target Assign");
 		view.setKnobIndicatorLevels();
 	}
 	else {
@@ -425,8 +425,12 @@ void MacroAssignOverlay::deleteSelectedTarget() {
 			Macros::changeTargetDestination(clip, heldMacro_, s, Macros::kNoDestination);
 		}
 	}
-	lastSlot_ = -1;                               // no live slot to cycle now
-	cycleOnRelease_ = false;                      // a delete cancels any pending release cycle
+	lastSlot_ = -1;          // no live slot to cycle now
+	cycleOnRelease_ = false; // a delete cancels any pending release cycle
+	// the deleted target's "<destination> / From - To" readout no longer describes anything: back to
+	// the picker's uninitialized state until another target is picked
+	display->popupText("Target Assign");
+	view.setKnobIndicatorLevels();                // gold knobs are back to driving the macro
 	uiNeedsRendering(getRootUI(), 0xFFFFFFFF, 0); // pad shows the remaining layer's colour, or grey if none left
 }
 
