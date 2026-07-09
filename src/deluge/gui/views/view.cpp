@@ -1590,7 +1590,7 @@ void View::modButtonAction(uint8_t whichButton, bool on) {
 					setModLedStates();
 					// announce the assign mode; the first pad tap replaces this with the per-target readout.
 					// Persistent for the whole hold (cancelled on release below).
-					display->popupText("Macro Assign");
+					display->popupText("Target Assign");
 					// HOLD-TO-ASSIGN: while the button is held, the main grid becomes this macro's target
 					// picker - tap a param pad to assign it to the next free slot (released below). The picker
 					// overlay renders on whichever clip-minder grid is active (note view, or an audio clip's
