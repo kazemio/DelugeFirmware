@@ -1571,8 +1571,9 @@ void View::modButtonAction(uint8_t whichButton, bool on) {
 				}
 			}
 			else {
+				display->cancelPopup();     // drop the persistent peek readout FIRST: close() may commit an
+				                            // encoder-dialed destination and confirm it with its own popup
 				macroAssignOverlay.close(); // release: main grid back to notes / waveform
-				display->cancelPopup();     // drop the persistent peek readout
 				setKnobIndicatorLevels();   // restore the macro's sourceKnobPos rings (From/To editing displaced them)
 			}
 		}
