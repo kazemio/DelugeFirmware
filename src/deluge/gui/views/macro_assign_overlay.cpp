@@ -24,6 +24,8 @@
 #include "model/output.h"
 #include "model/song/song.h"
 #include "modulation/macros/macros.h"
+#include "util/d_stringbuf.h"
+#include <cstdlib>
 
 using namespace deluge::gui;
 
@@ -34,6 +36,7 @@ void MacroAssignOverlay::open(int32_t macroIndex) {
 	lastX_ = -1;
 	lastY_ = -1;
 	lastSlot_ = -1;
+	pendingPosition_ = -1;
 	secondLayer_ = false;
 	cycleOnRelease_ = false;
 	altPhase_ = false;
@@ -48,9 +51,109 @@ void MacroAssignOverlay::close() {
 	if (heldMacro_ < 0) {
 		return;
 	}
+	commitPendingDestination();
 	heldMacro_ = -1;
+	pendingPosition_ = -1;
 	uiTimerManager.unsetTimer(TimerName::MACRO_ASSIGN_OVERLAY_PULSE);
 	uiNeedsRendering(getRootUI(), 0xFFFFFFFF, 0); // back to the view's normal main pads (notes / waveform)
+}
+
+// The destination byte the encoder's pending position currently points at, or -1 for none.
+int32_t MacroAssignOverlay::pendingDestination() const {
+	if (pendingPosition_ < 0 || heldMacro_ < 0) {
+		return -1;
+	}
+	Clip* clip = getCurrentClip();
+	Output* instrument = Macros::macroHost(clip);
+	if (instrument == nullptr) {
+		return -1;
+	}
+	return Macros::destinationForPosition(Macros::domainForOutput(clip->output), heldMacro_, pendingPosition_);
+}
+
+// Ending the hold commits the encoder's pending pick (if any) to the macro's next free target slot -
+// the encoder path only ever ADDS; removing a destination happens on its pad (SHIFT+SAVE) or in the
+// macro-lane automation view. A transient popup confirms what was added (the caller cancels the
+// persistent hold readout BEFORE close(), so this one survives).
+void MacroAssignOverlay::commitPendingDestination() {
+	int32_t destination = pendingDestination();
+	if (destination < 0) {
+		return;
+	}
+	Clip* clip = getCurrentClip();
+	Output* instrument = Macros::macroHost(clip);
+	Macros::Macro& macro = instrument->macros[heldMacro_];
+	for (const Macros::MacroTargetSlot& target : macro.targets) {
+		if (target.destination == (uint8_t)destination) {
+			return; // its pad was tapped during the same hold - already a target, don't add a duplicate
+		}
+	}
+	int32_t freeSlot = -1;
+	for (int32_t s = 0; s < Macros::kNumTargetSlots; s++) {
+		if (macro.targets[s].destination == Macros::kNoDestination) {
+			freeSlot = s;
+			break;
+		}
+	}
+	if (freeSlot < 0) {
+		display->displayPopup("MACRO SLOTS FULL");
+		return;
+	}
+	Macros::changeTargetDestination(clip, heldMacro_, freeSlot, (uint8_t)destination);
+	DEF_STACK_STRING_BUF(readout, 30);
+	Macros::appendDestinationName(readout, instrument, (uint8_t)destination);
+	readout.append(" added");
+	display->displayPopup(readout.c_str());
+}
+
+// A select-encoder turn while the picker is up: dial the pending destination through the domain's
+// whole dial space (the same space as the macro-lane quick-edit dial - every valid destination plus
+// this macro's cascade ids), skipping destinations the macro already targets (the encoder only adds;
+// existing targets are edited on their pads or in the macro-lane view). The pending pick's pad blinks
+// if it has one, and the readout names it. Dialing back below the first position cancels the pick.
+void MacroAssignOverlay::handleSelectEncoder(int32_t offset) {
+	Clip* clip = getCurrentClip();
+	Output* instrument = Macros::macroHost(clip);
+	if (instrument == nullptr || heldMacro_ < 0) {
+		return;
+	}
+	Macros::Domain domain = Macros::domainForOutput(clip->output);
+	Macros::Macro& macro = instrument->macros[heldMacro_];
+	auto alreadyTargeted = [&macro](int32_t destination) {
+		for (const Macros::MacroTargetSlot& target : macro.targets) {
+			if (target.destination == (uint8_t)destination) {
+				return true;
+			}
+		}
+		return false;
+	};
+	int32_t num = Macros::numDestinations(domain, heldMacro_);
+	int32_t step = (offset >= 0) ? 1 : -1;
+	int32_t position = pendingPosition_;
+	for (int32_t turns = std::abs(offset); turns > 0; turns--) {
+		int32_t next = position + step;
+		while (next >= 0 && next < num && alreadyTargeted(Macros::destinationForPosition(domain, heldMacro_, next))) {
+			next += step;
+		}
+		if (next < -1 || next >= num) {
+			break; // ran off that end of the dial - stay put (position -1 = no pending pick)
+		}
+		position = next;
+	}
+	if (position == pendingPosition_) {
+		return;
+	}
+	pendingPosition_ = position;
+	if (pendingPosition_ < 0) {
+		display->popupText("Macro Assign"); // pick cancelled - back to the idle hold readout
+	}
+	else {
+		DEF_STACK_STRING_BUF(readout, 30);
+		Macros::appendDestinationName(readout, instrument,
+		                              (uint8_t)Macros::destinationForPosition(domain, heldMacro_, pendingPosition_));
+		display->popupText(readout.c_str());
+	}
+	uiNeedsRendering(getRootUI(), 0xFFFFFFFF, 0); // move the blinking pending-pad highlight (if it has a pad)
 }
 
 void MacroAssignOverlay::pulse() {
@@ -74,6 +177,7 @@ void MacroAssignOverlay::renderOverlay(RGB image[][kDisplayWidth + kSideBarWidth
 	}
 	Macros::Domain domain = Macros::domainForOutput(clip->output);
 	Macros::Macro& macro = instrument->macros[heldMacro_];
+	int32_t pending = pendingDestination(); // the encoder-dialed pick blinks its pad, if it has one
 	for (int32_t y = 0; y < kDisplayHeight; y++) {
 		for (int32_t x = 0; x < kDisplayWidth; x++) {
 			int32_t primary = Macros::macroDestinationForPad(domain, x, y, false);
@@ -102,6 +206,10 @@ void MacroAssignOverlay::renderOverlay(RGB image[][kDisplayWidth + kSideBarWidth
 			}
 			else if (secondAssigned) {
 				image[y][x] = colours::yellow; // second-layer shortcut assigned (matches its yellow elsewhere)
+			}
+			else if (pending >= 0 && (primary == pending || second == pending)) {
+				// the encoder's pending pick: blinks grey<->white until committed on release
+				image[y][x] = altPhase_ ? colours::white_full : colours::grey;
 			}
 			else {
 				image[y][x] = colours::grey; // assignable, not yet assigned

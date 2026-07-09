@@ -1787,6 +1787,13 @@ bool InstrumentClipView::changeOutputType(OutputType newOutputType) {
 
 void InstrumentClipView::selectEncoderAction(int8_t offset) {
 
+	// While a macro button is held (target picker up), the select encoder dials a destination to add -
+	// reaching params that have no shortcut pad (e.g. most MIDI CCs); committed on release.
+	if (macroAssignOverlay.active()) {
+		macroAssignOverlay.handleSelectEncoder(offset);
+		return;
+	}
+
 	// User may be trying to edit noteCode...
 	if (currentUIMode == UI_MODE_AUDITIONING) {
 		if (Buttons::isButtonPressed(deluge::hid::button::SELECT_ENC)) {
