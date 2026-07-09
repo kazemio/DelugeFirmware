@@ -826,8 +826,9 @@ void View::modEncoderAction(int32_t whichModEncoder, int32_t offset) {
 	// Note-view MACRO mode owns both gold knobs: either knob drives the currently-selected macro.
 	// Checked before tryKnobMacro so the mode takes precedence over any learned gold-knob source.
 	if (inMacroKnobMode()) {
-		// While the target picker is up with a slot selected, the knobs shape THAT target's From/To (with
-		// the macro-lane view's readout) instead of driving the whole macro.
+		// While the target picker is up with a slot selected (tapped, or a pending encoder pick), the
+		// knobs shape THAT target's From/To (with the macro-lane view's readout) instead of driving
+		// the whole macro.
 		if (macroAssignOverlay.editingTarget()) {
 			macroAssignOverlay.handleModEncoder(whichModEncoder, offset);
 		}
