@@ -36,7 +36,7 @@ class Clip;
 //
 // It is view-agnostic - it resolves the *current* clip's domain each call - so both InstrumentClipView
 // and AudioClipView drive the one global instance without depending on each other.
-class MacroAssignOverlay {
+class MacroTargetAssignOverlay {
 public:
 	bool active() const { return heldMacro_ >= 0; }
 	// True once a target slot has been selected by a tap, or an encoder pick is pending: the gold
@@ -89,4 +89,4 @@ private:
 	bool altPhase_ = false; // slow white/yellow blink phase for both-layers-assigned pads
 };
 
-extern MacroAssignOverlay macroAssignOverlay;
+extern MacroTargetAssignOverlay macroTargetAssignOverlay;
