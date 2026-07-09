@@ -15,7 +15,7 @@
  * If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include "gui/views/macro_assign_overlay.h"
+#include "gui/views/macro_target_assign_overlay.h"
 #include "gui/colour/colour.h"
 #include "gui/ui/ui.h"
 #include "gui/ui_timer_manager.h"
@@ -30,9 +30,9 @@
 
 using namespace deluge::gui;
 
-MacroAssignOverlay macroAssignOverlay{};
+MacroTargetAssignOverlay macroTargetAssignOverlay{};
 
-void MacroAssignOverlay::open(int32_t macroIndex) {
+void MacroTargetAssignOverlay::open(int32_t macroIndex) {
 	heldMacro_ = (int8_t)macroIndex;
 	lastX_ = -1;
 	lastY_ = -1;
@@ -42,25 +42,25 @@ void MacroAssignOverlay::open(int32_t macroIndex) {
 	cycleOnRelease_ = false;
 	altPhase_ = false;
 	// slow alternation for any pad with both shortcut layers assigned (~0.7 Hz)
-	uiTimerManager.setTimer(TimerName::MACRO_ASSIGN_OVERLAY_PULSE, 700);
+	uiTimerManager.setTimer(TimerName::MACRO_TARGET_ASSIGN_PULSE, 700);
 	// repaint whichever clip-minder grid is showing (note view, or an audio clip's waveform) so the
 	// picker overlay takes over the main pads
 	uiNeedsRendering(getRootUI(), 0xFFFFFFFF, 0);
 }
 
-void MacroAssignOverlay::close() {
+void MacroTargetAssignOverlay::close() {
 	if (heldMacro_ < 0) {
 		return;
 	}
 	commitPendingDestination();
 	heldMacro_ = -1;
 	pendingPosition_ = -1;
-	uiTimerManager.unsetTimer(TimerName::MACRO_ASSIGN_OVERLAY_PULSE);
+	uiTimerManager.unsetTimer(TimerName::MACRO_TARGET_ASSIGN_PULSE);
 	uiNeedsRendering(getRootUI(), 0xFFFFFFFF, 0); // back to the view's normal main pads (notes / waveform)
 }
 
 // The destination byte the encoder's pending position currently points at, or -1 for none.
-int32_t MacroAssignOverlay::pendingDestination() const {
+int32_t MacroTargetAssignOverlay::pendingDestination() const {
 	if (pendingPosition_ < 0 || heldMacro_ < 0) {
 		return -1;
 	}
@@ -72,7 +72,7 @@ int32_t MacroAssignOverlay::pendingDestination() const {
 	return Macros::destinationForPosition(Macros::domainForOutput(clip->output), heldMacro_, pendingPosition_);
 }
 
-int32_t MacroAssignOverlay::firstFreeSlot() const {
+int32_t MacroTargetAssignOverlay::firstFreeSlot() const {
 	Output* instrument = Macros::macroHost(getCurrentClip());
 	if (instrument == nullptr || heldMacro_ < 0) {
 		return -1;
@@ -92,7 +92,7 @@ int32_t MacroAssignOverlay::firstFreeSlot() const {
 // are kept: changeTargetDestination only resets a slot's range when CLEARING it. A transient popup
 // confirms what was added (the caller cancels the persistent hold readout BEFORE close(), so this
 // one survives).
-void MacroAssignOverlay::commitPendingDestination() {
+void MacroTargetAssignOverlay::commitPendingDestination() {
 	int32_t destination = pendingDestination();
 	if (destination < 0) {
 		return;
@@ -124,7 +124,7 @@ void MacroAssignOverlay::commitPendingDestination() {
 // if it has one, and the readout mirrors the quick-edit target readout - "<destination> / From - To"
 // on the staging slot, knob rings seeded to match, gold knobs shaping the range live. Dialing back
 // below the first position cancels the pick (and resets the staging slot's range).
-void MacroAssignOverlay::handleSelectEncoder(int32_t offset) {
+void MacroTargetAssignOverlay::handleSelectEncoder(int32_t offset) {
 	Clip* clip = getCurrentClip();
 	Output* instrument = Macros::macroHost(clip);
 	if (instrument == nullptr || heldMacro_ < 0) {
@@ -177,20 +177,20 @@ void MacroAssignOverlay::handleSelectEncoder(int32_t offset) {
 	uiNeedsRendering(getRootUI(), 0xFFFFFFFF, 0); // move the blinking pending-pad highlight (if it has a pad)
 }
 
-void MacroAssignOverlay::pulse() {
+void MacroTargetAssignOverlay::pulse() {
 	if (!active()) {
 		return; // picker closed - let the timer lapse
 	}
 	altPhase_ = !altPhase_;
 	uiNeedsRendering(getRootUI(), 0xFFFFFFFF, 0);
-	uiTimerManager.setTimer(TimerName::MACRO_ASSIGN_OVERLAY_PULSE, 700); // re-arm
+	uiTimerManager.setTimer(TimerName::MACRO_TARGET_ASSIGN_PULSE, 700); // re-arm
 }
 
 // The picker overlay: assignable params light grey; params already targeted by the held macro (either
 // shortcut layer) light bright; pads that aren't a valid destination go dark. Same resolution as the
 // automation-view grid picker, reused via Macros::macroDestinationForPad.
-void MacroAssignOverlay::renderOverlay(RGB image[][kDisplayWidth + kSideBarWidth],
-                                       uint8_t occupancyMask[][kDisplayWidth + kSideBarWidth]) {
+void MacroTargetAssignOverlay::renderOverlay(RGB image[][kDisplayWidth + kSideBarWidth],
+                                             uint8_t occupancyMask[][kDisplayWidth + kSideBarWidth]) {
 	Clip* clip = getCurrentClip();
 	Output* instrument = Macros::macroHost(clip);
 	if (instrument == nullptr || heldMacro_ < 0) {
@@ -246,7 +246,7 @@ void MacroAssignOverlay::renderOverlay(RGB image[][kDisplayWidth + kSideBarWidth
 // primary and second-layer params are both targets, the selection cycles between them - but that
 // cycle happens on pad RELEASE, not press, so press-and-holding the pad keeps the shown layer stable
 // (SHIFT+DELETE then removes exactly the layer you see; a plain tap still cycles on release).
-void MacroAssignOverlay::handlePad(int32_t x, int32_t y, int32_t velocity) {
+void MacroTargetAssignOverlay::handlePad(int32_t x, int32_t y, int32_t velocity) {
 	Clip* clip = getCurrentClip();
 	Output* instrument = Macros::macroHost(clip);
 	if (instrument == nullptr || heldMacro_ < 0) {
@@ -344,7 +344,7 @@ void MacroAssignOverlay::handlePad(int32_t x, int32_t y, int32_t velocity) {
 }
 
 // Assigns `destination` to the macro's next free target slot and selects it, or shows MACRO SLOTS FULL.
-void MacroAssignOverlay::addLayer(Clip* clip, int32_t x, int32_t y, int32_t destination, bool addingSecond) {
+void MacroTargetAssignOverlay::addLayer(Clip* clip, int32_t x, int32_t y, int32_t destination, bool addingSecond) {
 	Output* instrument = Macros::macroHost(clip);
 	if (instrument == nullptr) {
 		return;
@@ -373,7 +373,7 @@ void MacroAssignOverlay::addLayer(Clip* clip, int32_t x, int32_t y, int32_t dest
 // On a pad tap / selection change, show the selected target's "<destination> / From - To" readout and
 // seed the knob rings, so the same feedback the macro-lane view gives on target-button PRESS appears
 // immediately - not only once the gold knob is first turned.
-void MacroAssignOverlay::showReadout() {
+void MacroTargetAssignOverlay::showReadout() {
 	if (lastSlot_ < 0 || heldMacro_ < 0) {
 		return;
 	}
@@ -386,7 +386,7 @@ void MacroAssignOverlay::showReadout() {
 	Macros::showTargetKnobIndicators(instrument, heldMacro_, lastSlot_);
 }
 
-void MacroAssignOverlay::deleteSelectedTarget() {
+void MacroTargetAssignOverlay::deleteSelectedTarget() {
 	if (!active() || lastX_ < 0) {
 		return; // nothing selected yet
 	}
@@ -439,7 +439,7 @@ void MacroAssignOverlay::deleteSelectedTarget() {
 // same re-bake, same "destination name / From - To" readout and knob-ring feedback. While the select
 // encoder has a pending pick dialed, the knobs shape the pick's staging slot instead - its range is
 // then already in place when the release commits the destination into that slot.
-void MacroAssignOverlay::handleModEncoder(int32_t whichModEncoder, int32_t offset) {
+void MacroTargetAssignOverlay::handleModEncoder(int32_t whichModEncoder, int32_t offset) {
 	Clip* clip = getCurrentClip();
 	Output* instrument = Macros::macroHost(clip);
 	if (instrument == nullptr || heldMacro_ < 0) {

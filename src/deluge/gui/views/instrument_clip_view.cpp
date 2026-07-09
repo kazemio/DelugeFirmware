@@ -38,7 +38,7 @@
 #include "gui/ui/ui.h"
 #include "gui/ui_timer_manager.h"
 #include "gui/views/automation_view.h"
-#include "gui/views/macro_assign_overlay.h"
+#include "gui/views/macro_target_assign_overlay.h"
 #include "gui/views/timeline_view.h"
 #include "gui/views/view.h"
 #include "hid/buttons.h"
@@ -255,8 +255,8 @@ ActionResult InstrumentClipView::buttonAction(deluge::hid::Button b, bool on, bo
 
 	// SHIFT + SAVE/DELETE while holding a macro button (target picker up): delete the currently-selected
 	// pad's assignment from this macro; the pad reverts to grey.
-	if (macroAssignOverlay.active() && b == SAVE && on && Buttons::isShiftButtonPressed()) {
-		macroAssignOverlay.deleteSelectedTarget();
+	if (macroTargetAssignOverlay.active() && b == SAVE && on && Buttons::isShiftButtonPressed()) {
+		macroTargetAssignOverlay.deleteSelectedTarget();
 		return ActionResult::DEALT_WITH;
 	}
 
@@ -1789,8 +1789,8 @@ void InstrumentClipView::selectEncoderAction(int8_t offset) {
 
 	// While a macro button is held (target picker up), the select encoder dials a destination to add -
 	// reaching params that have no shortcut pad (e.g. most MIDI CCs); committed on release.
-	if (macroAssignOverlay.active()) {
-		macroAssignOverlay.handleSelectEncoder(offset);
+	if (macroTargetAssignOverlay.active()) {
+		macroTargetAssignOverlay.handleSelectEncoder(offset);
 		return;
 	}
 
@@ -1886,11 +1886,11 @@ ActionResult InstrumentClipView::padAction(int32_t x, int32_t y, int32_t velocit
 	// Macro-target picker (a macro button is held in MACRO mode): main-grid taps assign params to the
 	// held macro's next free target slot. Both press and release are handled (the both-layer cycle
 	// happens on release). Every main-grid press/release is consumed so nothing edits notes.
-	if (macroAssignOverlay.active() && x < kDisplayWidth) {
+	if (macroTargetAssignOverlay.active() && x < kDisplayWidth) {
 		if (sdRoutineLock) {
 			return ActionResult::REMIND_ME_OUTSIDE_CARD_ROUTINE;
 		}
-		macroAssignOverlay.handlePad(x, y, velocity);
+		macroTargetAssignOverlay.handlePad(x, y, velocity);
 		return ActionResult::DEALT_WITH;
 	}
 
@@ -7384,9 +7384,9 @@ bool InstrumentClipView::renderMainPads(uint32_t whichRows, RGB image[][kDisplay
 	}
 
 	// While a macro button is held in MACRO mode, the main grid is the macro-target picker instead of notes.
-	if (macroAssignOverlay.active()) {
+	if (macroTargetAssignOverlay.active()) {
 		PadLEDs::renderingLock = true;
-		macroAssignOverlay.renderOverlay(image, occupancyMask);
+		macroTargetAssignOverlay.renderOverlay(image, occupancyMask);
 		PadLEDs::renderingLock = false;
 		return true;
 	}

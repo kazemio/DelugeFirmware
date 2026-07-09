@@ -26,7 +26,7 @@
 #include "gui/ui_timer_manager.h"
 #include "gui/views/arranger_view.h"
 #include "gui/views/automation_view.h"
-#include "gui/views/macro_assign_overlay.h"
+#include "gui/views/macro_target_assign_overlay.h"
 #include "gui/views/session_view.h"
 #include "gui/views/view.h"
 #include "gui/waveform/waveform_renderer.h"
@@ -111,8 +111,8 @@ bool AudioClipView::renderMainPads(uint32_t whichRows, RGB image[][kDisplayWidth
 	// While a macro button is held in MACRO mode, the shared target-picker overlay owns the main pads
 	// (param shortcuts to assign), exactly as in note view - it replaces the waveform for the duration
 	// of the hold, resolving this audio clip's GLOBAL destinations.
-	if (macroAssignOverlay.active()) {
-		macroAssignOverlay.renderOverlay(image, occupancyMask);
+	if (macroTargetAssignOverlay.active()) {
+		macroTargetAssignOverlay.renderOverlay(image, occupancyMask);
 		return true;
 	}
 
@@ -349,8 +349,8 @@ ActionResult AudioClipView::buttonAction(deluge::hid::Button b, bool on, bool in
 
 	// SHIFT + SAVE/DELETE while the macro target-picker overlay is up: remove the selected pad's
 	// assignment (the same gesture note view offers during the hold).
-	if (macroAssignOverlay.active() && b == SAVE && on && Buttons::isShiftButtonPressed()) {
-		macroAssignOverlay.deleteSelectedTarget();
+	if (macroTargetAssignOverlay.active() && b == SAVE && on && Buttons::isShiftButtonPressed()) {
+		macroTargetAssignOverlay.deleteSelectedTarget();
 		return ActionResult::DEALT_WITH;
 	}
 
@@ -503,11 +503,11 @@ ActionResult AudioClipView::padAction(int32_t x, int32_t y, int32_t on) {
 	if (x < kDisplayWidth) {
 		// While the macro target-picker overlay owns the main pads, a tap picks that param as the held
 		// macro's target; every press is consumed so nothing edits the waveform under the overlay.
-		if (macroAssignOverlay.active()) {
+		if (macroTargetAssignOverlay.active()) {
 			if (sdRoutineLock) {
 				return ActionResult::REMIND_ME_OUTSIDE_CARD_ROUTINE;
 			}
-			macroAssignOverlay.handlePad(x, y, on);
+			macroTargetAssignOverlay.handlePad(x, y, on);
 			return ActionResult::DEALT_WITH;
 		}
 		if (Buttons::isButtonPressed(deluge::hid::button::TEMPO_ENC)) {
@@ -765,8 +765,8 @@ void AudioClipView::sampleNeedsReRendering(Sample* s) {
 void AudioClipView::selectEncoderAction(int8_t offset) {
 	// While a macro button is held (target picker up), the select encoder dials a destination to add -
 	// reaching params that have no shortcut pad; committed on release.
-	if (macroAssignOverlay.active()) {
-		macroAssignOverlay.handleSelectEncoder(offset);
+	if (macroTargetAssignOverlay.active()) {
+		macroTargetAssignOverlay.handleSelectEncoder(offset);
 		return;
 	}
 	if (currentUIMode) {
