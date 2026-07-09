@@ -19,6 +19,7 @@
 #include "gui/colour/colour.h"
 #include "gui/ui/ui.h"
 #include "gui/ui_timer_manager.h"
+#include "gui/views/view.h"
 #include "hid/display/display.h"
 #include "model/clip/clip.h"
 #include "model/output.h"
@@ -71,10 +72,26 @@ int32_t MacroAssignOverlay::pendingDestination() const {
 	return Macros::destinationForPosition(Macros::domainForOutput(clip->output), heldMacro_, pendingPosition_);
 }
 
+int32_t MacroAssignOverlay::firstFreeSlot() const {
+	Output* instrument = Macros::macroHost(getCurrentClip());
+	if (instrument == nullptr || heldMacro_ < 0) {
+		return -1;
+	}
+	Macros::Macro& macro = instrument->macros[heldMacro_];
+	for (int32_t s = 0; s < Macros::kNumTargetSlots; s++) {
+		if (macro.targets[s].destination == Macros::kNoDestination) {
+			return s;
+		}
+	}
+	return -1;
+}
+
 // Ending the hold commits the encoder's pending pick (if any) to the macro's next free target slot -
 // the encoder path only ever ADDS; removing a destination happens on its pad (SHIFT+SAVE) or in the
-// macro-lane automation view. A transient popup confirms what was added (the caller cancels the
-// persistent hold readout BEFORE close(), so this one survives).
+// macro-lane automation view. The staging slot's From/To (shaped by the gold knobs during the dial)
+// are kept: changeTargetDestination only resets a slot's range when CLEARING it. A transient popup
+// confirms what was added (the caller cancels the persistent hold readout BEFORE close(), so this
+// one survives).
 void MacroAssignOverlay::commitPendingDestination() {
 	int32_t destination = pendingDestination();
 	if (destination < 0) {
@@ -88,13 +105,7 @@ void MacroAssignOverlay::commitPendingDestination() {
 			return; // its pad was tapped during the same hold - already a target, don't add a duplicate
 		}
 	}
-	int32_t freeSlot = -1;
-	for (int32_t s = 0; s < Macros::kNumTargetSlots; s++) {
-		if (macro.targets[s].destination == Macros::kNoDestination) {
-			freeSlot = s;
-			break;
-		}
-	}
+	int32_t freeSlot = firstFreeSlot();
 	if (freeSlot < 0) {
 		display->displayPopup("MACRO SLOTS FULL");
 		return;
@@ -110,11 +121,18 @@ void MacroAssignOverlay::commitPendingDestination() {
 // whole dial space (the same space as the macro-lane quick-edit dial - every valid destination plus
 // this macro's cascade ids), skipping destinations the macro already targets (the encoder only adds;
 // existing targets are edited on their pads or in the macro-lane view). The pending pick's pad blinks
-// if it has one, and the readout names it. Dialing back below the first position cancels the pick.
+// if it has one, and the readout mirrors the quick-edit target readout - "<destination> / From - To"
+// on the staging slot, knob rings seeded to match, gold knobs shaping the range live. Dialing back
+// below the first position cancels the pick (and resets the staging slot's range).
 void MacroAssignOverlay::handleSelectEncoder(int32_t offset) {
 	Clip* clip = getCurrentClip();
 	Output* instrument = Macros::macroHost(clip);
 	if (instrument == nullptr || heldMacro_ < 0) {
+		return;
+	}
+	int32_t freeSlot = firstFreeSlot();
+	if (freeSlot < 0) {
+		display->displayPopup("MACRO SLOTS FULL"); // nothing to dial for - a pick could never commit
 		return;
 	}
 	Macros::Domain domain = Macros::domainForOutput(clip->output);
@@ -145,13 +163,16 @@ void MacroAssignOverlay::handleSelectEncoder(int32_t offset) {
 	}
 	pendingPosition_ = position;
 	if (pendingPosition_ < 0) {
-		display->popupText("Macro Assign"); // pick cancelled - back to the idle hold readout
+		// pick cancelled: give the staging slot its pristine range back (any gold-knob shaping was
+		// for this pick only) and drop back to the idle hold readout / macro knob rings
+		macro.targets[freeSlot] = Macros::MacroTargetSlot{};
+		display->popupText("Macro Assign");
+		view.setKnobIndicatorLevels();
 	}
 	else {
-		DEF_STACK_STRING_BUF(readout, 30);
-		Macros::appendDestinationName(readout, instrument,
-		                              (uint8_t)Macros::destinationForPosition(domain, heldMacro_, pendingPosition_));
-		display->popupText(readout.c_str());
+		uint8_t destination = (uint8_t)Macros::destinationForPosition(domain, heldMacro_, pendingPosition_);
+		Macros::showTargetRangeReadout(instrument, heldMacro_, freeSlot, destination, false);
+		Macros::showTargetKnobIndicators(instrument, heldMacro_, freeSlot);
 	}
 	uiNeedsRendering(getRootUI(), 0xFFFFFFFF, 0); // move the blinking pending-pad highlight (if it has a pad)
 }
@@ -236,6 +257,12 @@ void MacroAssignOverlay::handlePad(int32_t x, int32_t y, int32_t velocity) {
 	int32_t second = Macros::macroDestinationForPad(domain, x, y, true);
 	if (primary < 0 && second < 0) {
 		return; // a dark pad - not a pickable destination
+	}
+	// A pad tap while an encoder pick is pending commits the pick right now (both additions are
+	// kept), then proceeds - so the readout and gold knobs always follow the latest interaction.
+	if (velocity && pendingPosition_ >= 0) {
+		commitPendingDestination();
+		pendingPosition_ = -1;
 	}
 	Macros::Macro& macro = instrument->macros[heldMacro_];
 
@@ -405,11 +432,27 @@ void MacroAssignOverlay::deleteSelectedTarget() {
 
 // A gold-knob turn while the picker is up and a target slot is selected: shape THAT target's From/To
 // (knob 0 = From, knob 1 = To), mirroring the macro-lane view's held-target editing - same clamp,
-// same re-bake, same "destination name / From - To" readout and knob-ring feedback.
+// same re-bake, same "destination name / From - To" readout and knob-ring feedback. While the select
+// encoder has a pending pick dialed, the knobs shape the pick's staging slot instead - its range is
+// then already in place when the release commits the destination into that slot.
 void MacroAssignOverlay::handleModEncoder(int32_t whichModEncoder, int32_t offset) {
 	Clip* clip = getCurrentClip();
 	Output* instrument = Macros::macroHost(clip);
-	if (instrument == nullptr || heldMacro_ < 0 || lastSlot_ < 0) {
+	if (instrument == nullptr || heldMacro_ < 0) {
+		return;
+	}
+	int32_t pending = pendingDestination();
+	if (pending >= 0) {
+		int32_t freeSlot = firstFreeSlot();
+		if (freeSlot < 0) {
+			return; // can't happen while a pick is dialed (the dial refuses with no free slot)
+		}
+		Macros::editTargetEndpoint(clip, instrument, heldMacro_, freeSlot, whichModEncoder, offset);
+		Macros::showTargetRangeReadout(instrument, heldMacro_, freeSlot, (uint8_t)pending, false);
+		Macros::showTargetKnobIndicators(instrument, heldMacro_, freeSlot);
+		return;
+	}
+	if (lastSlot_ < 0) {
 		return;
 	}
 	Macros::editTargetEndpoint(clip, instrument, heldMacro_, lastSlot_, whichModEncoder, offset);
