@@ -1120,8 +1120,7 @@ void writeMacrosToFile(Serializer& writer, Macro* macros, Domain domain) {
 }
 
 // Reads a target's destination/param/from/to attributes (e.g. <target1 cc="42" from="0" to="100" />
-// on MIDI, <target1 param="lpfFrequency" .../> on internal domains). Unknown attributes - including
-// the retired "send" per-target mute from older files - are skipped.
+// on MIDI, <target1 param="lpfFrequency" .../> on internal domains). Unknown attributes are skipped.
 static void readTargetFromFile(Deserializer& reader, MacroTargetSlot& target, int32_t macroIndex, Domain domain) {
 	int32_t destination = kNoDestination;
 	int32_t from = kDefaultFrom;
