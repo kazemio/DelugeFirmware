@@ -191,7 +191,6 @@ public:
 	// public so uiTimerManager and editor layouts can access it
 	void blinkInterpolationShortcut();
 	void blinkPadSelectionShortcut();
-	void blinkMacroCaptureShortcuts();
 	// persistent "Macro N / Inactive" status while an inactive macro lane is in view; safe to call
 	// anytime - shows, re-shows or clears based on current state
 	void refreshMacroInactivePopup();
@@ -209,7 +208,6 @@ public:
 	void resetInterpolationShortcutBlinking();
 	void initPadSelection();
 	void resetPadSelectionShortcutBlinking();
-	void resetMacroCaptureShortcutBlinking();
 
 	AutomationParamType automationParamType;
 	bool getAffectEntire() override;
@@ -310,7 +308,6 @@ private:
 	bool parameterShortcutBlinking;
 	bool interpolationShortcutBlinking;
 	bool padSelectionShortcutBlinking;
-	bool macroCaptureShortcutBlinking;
 
 	int32_t getEffectiveLength(ModelStackWithTimelineCounter* modelStack);
 
