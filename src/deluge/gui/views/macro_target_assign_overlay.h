@@ -64,12 +64,10 @@ private:
 	void addLayer(Clip* clip, int32_t x, int32_t y, int32_t destination, bool addingSecond);
 	// The destination byte pendingPosition_ points at, or -1 for none.
 	int32_t pendingDestination() const;
-	// The macro's first free target slot, or -1 when all 8 are taken. While a pending pick is dialed,
-	// this slot is BORROWED as the pick's staging slot: the range readout / knob rings show its From/To
-	// and the gold knobs shape them, so commit (which keeps a slot's existing range) lands exactly what
-	// was previewed - the same UI as the macro-lane quick-edit, on the slot the pick will occupy.
+	// The macro's first free target slot, or -1 when all 8 are taken. Used to claim stagingSlot_ when
+	// a pick starts dialing, and as the commit-time fallback if the staged slot got consumed mid-hold.
 	int32_t firstFreeSlot() const;
-	// Adds the encoder's pending pick to the next free slot on hold end (called from close()).
+	// Commits the encoder's pending pick into its staging slot on hold end (called from close()).
 	void commitPendingDestination();
 	// Shows the selected target's range readout + knob rings on tap / selection change.
 	void showReadout();
@@ -77,6 +75,12 @@ private:
 	// The encoder-dialed pending pick as a position in the destination dial space, or -1 for none.
 	// The destination byte itself is domain-ambiguous, so the position is resolved on use.
 	int32_t pendingPosition_ = -1;
+	// The still-free slot the pending pick STAGES on, claimed at the first dial landing and held for
+	// the whole pick: the range readout / knob rings show its From/To and the gold knobs shape them,
+	// so commit (which keeps a slot's existing range) lands exactly what was previewed - the same UI
+	// as the macro-lane quick-edit, on the very slot the pick will occupy. Remembered (not re-derived)
+	// so mid-hold slot reshuffles can't shift it; its range is reset on every pick change/cancel.
+	int8_t stagingSlot_ = -1;
 
 	int8_t heldMacro_ = -1; // held macro (0..kNumMacros-1), or -1 when the picker is inactive
 	int8_t lastX_ = -1;
