@@ -1546,6 +1546,19 @@ void View::modButtonAction(uint8_t whichButton, bool on) {
 		}
 	}
 
+	// A macro-button release must ALWAYS tear the target picker down, even when MACRO mode became
+	// unavailable during the hold (e.g. AFFECT ENTIRE toggled off on a kit, or SHIFT+Y_ENC flipped the
+	// mode - neither is blocked while a mod button is held): inMacroKnobMode() is false by then, so
+	// the branch below would never run and the picker would stay stuck owning the pads and encoder.
+	if (!on && !inMacroKnobMode() && macroTargetAssignOverlay.active()
+	    && Macros::macroFromModButton(whichButton) >= 0) {
+		display->cancelPopup();           // drop the persistent hold readout (close() may popup its own)
+		macroTargetAssignOverlay.close(); // commits any pending encoder pick, releases the grid
+		setKnobIndicatorLevels();
+		setModLedStates(); // the mode ended mid-hold - repaint the mod LEDs for wherever we are now
+		return;
+	}
+
 	// Note-view MACRO mode: the mod buttons select/drill into macros instead of param modes. The four
 	// macro buttons map to macros; the other four do nothing (they must not change modKnobMode).
 	if (inMacroKnobMode()) {
