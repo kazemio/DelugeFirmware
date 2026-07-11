@@ -447,7 +447,7 @@ void AutomationView::initializeView() {
 				if (clip->lastSelectedParamKind == params::Kind::UNPATCHED_GLOBAL) {
 					// A leftover macro lane selection must not resurrect affect-entire: kit macros only
 					// apply while it's on (the user turned it off), so drop to the overview instead.
-					if (!clip->affectEntire
+					if (!view.macroKnobModeAvailable(clip)
 					    && Macros::macroIndexForLaneSelection(output, clip->lastSelectedParamKind,
 					                                          clip->lastSelectedParamID)
 					           >= 0) {

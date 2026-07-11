@@ -270,7 +270,12 @@ bool editTargetEndpoint(Clip* clip, Output* instrument, int32_t macroIndex, int3
 		return false;
 	}
 	endpoint = (uint8_t)v;
-	markHostEdited(instrument);
+	// Shaping an OFF slot (the assign picker staging a pending pick) isn't a persistent edit yet -
+	// the host is marked when the destination commits (changeTargetDestination), so a cancelled
+	// pick leaves the instrument unmarked.
+	if (f.destination != kNoDestination) {
+		markHostEdited(instrument);
+	}
 	reFanTarget(clip, macroIndex, slot, nullptr); // only this target's scaling changed - re-bake just its lane
 	return true;
 }
