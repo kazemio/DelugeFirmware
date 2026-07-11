@@ -3948,7 +3948,7 @@ ActionResult InstrumentClipView::handleNoteRowEditorButtonAction(deluge::hid::Bu
 			// A kit's gold-knob MACRO mode only applies in affect-entire (its macros drive kit-global
 			// params), so turning affect-entire off drops cleanly back to param control - re-enter with
 			// SHIFT+Y_ENC. Refresh the knob rings / mod LEDs so the switch is immediate.
-			if (!clip->affectEntire && clip->output->macroKnobMode) {
+			if (clip->output->macroKnobMode && !view.macroKnobModeAvailable(clip)) {
 				clip->output->macroKnobMode = false;
 				view.setKnobIndicatorLevels();
 				view.setModLedStates();

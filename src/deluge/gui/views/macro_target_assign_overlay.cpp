@@ -32,6 +32,15 @@ using namespace deluge::gui;
 
 MacroTargetAssignOverlay macroTargetAssignOverlay{};
 
+static bool macroTargets(const Macros::Macro& macro, int32_t destination) {
+	for (const Macros::MacroTargetSlot& target : macro.targets) {
+		if (target.destination == (uint8_t)destination) {
+			return true;
+		}
+	}
+	return false;
+}
+
 void MacroTargetAssignOverlay::open(int32_t macroIndex) {
 	heldMacro_ = (int8_t)macroIndex;
 	lastX_ = -1;
@@ -103,15 +112,13 @@ void MacroTargetAssignOverlay::commitPendingDestination() {
 	Clip* clip = getCurrentClip();
 	Output* instrument = Macros::macroHost(clip);
 	Macros::Macro& macro = instrument->macros[heldMacro_];
-	for (const Macros::MacroTargetSlot& target : macro.targets) {
-		if (target.destination == (uint8_t)destination) {
-			// its pad was tapped during the same hold - already a target, don't add a duplicate; give
-			// the staging slot its pristine range back rather than leaving shaped From/To on an OFF slot
-			if (slot >= 0 && macro.targets[slot].destination == Macros::kNoDestination) {
-				macro.targets[slot] = Macros::MacroTargetSlot{};
-			}
-			return;
+	if (macroTargets(macro, destination)) {
+		// its pad was tapped during the same hold - already a target, don't add a duplicate; give
+		// the staging slot its pristine range back rather than leaving shaped From/To on an OFF slot
+		if (slot >= 0 && macro.targets[slot].destination == Macros::kNoDestination) {
+			macro.targets[slot] = Macros::MacroTargetSlot{};
 		}
+		return;
 	}
 	// Land in the staged slot; fall back to the first free one if it was somehow consumed mid-hold
 	// (a fresh slot then correctly carries the default range, not the staged shaping).
@@ -147,25 +154,21 @@ void MacroTargetAssignOverlay::handleSelectEncoder(int32_t offset) {
 	// the gold-knob shaping.
 	int32_t staging = (stagingSlot_ >= 0) ? stagingSlot_ : firstFreeSlot();
 	if (staging < 0) {
-		display->displayPopup("MACRO SLOTS FULL"); // nothing to dial for - a pick could never commit
+		// nothing to dial for - a pick could never commit. Persistent (not a transient popup): it
+		// replaces the hold readout with an accurate one instead of expiring to a blank display, and
+		// a mid-hold SHIFT+SAVE delete resets it to "Target Assign" like any other readout.
+		display->popupText("MACRO SLOTS FULL");
 		return;
 	}
 	Macros::Domain domain = Macros::domainForOutput(clip->output);
 	Macros::Macro& macro = instrument->macros[heldMacro_];
-	auto alreadyTargeted = [&macro](int32_t destination) {
-		for (const Macros::MacroTargetSlot& target : macro.targets) {
-			if (target.destination == (uint8_t)destination) {
-				return true;
-			}
-		}
-		return false;
-	};
 	int32_t num = Macros::numDestinations(domain, heldMacro_);
 	int32_t step = (offset >= 0) ? 1 : -1;
 	int32_t position = pendingPosition_;
 	for (int32_t turns = std::abs(offset); turns > 0; turns--) {
 		int32_t next = position + step;
-		while (next >= 0 && next < num && alreadyTargeted(Macros::destinationForPosition(domain, heldMacro_, next))) {
+		while (next >= 0 && next < num
+		       && macroTargets(macro, Macros::destinationForPosition(domain, heldMacro_, next))) {
 			next += step;
 		}
 		if (next < -1 || next >= num) {
@@ -367,14 +370,7 @@ void MacroTargetAssignOverlay::addLayer(Clip* clip, int32_t x, int32_t y, int32_
 	if (instrument == nullptr) {
 		return;
 	}
-	Macros::Macro& macro = instrument->macros[heldMacro_];
-	int32_t freeSlot = -1;
-	for (int32_t s = 0; s < Macros::kNumTargetSlots; s++) {
-		if (macro.targets[s].destination == Macros::kNoDestination) {
-			freeSlot = s;
-			break;
-		}
-	}
+	int32_t freeSlot = firstFreeSlot();
 	if (freeSlot < 0) {
 		display->displayPopup("MACRO SLOTS FULL");
 		return;
@@ -463,21 +459,15 @@ void MacroTargetAssignOverlay::handleModEncoder(int32_t whichModEncoder, int32_t
 	if (instrument == nullptr || heldMacro_ < 0) {
 		return;
 	}
+	// A pending pick shapes its staging slot (whose destination byte isn't set until release - the
+	// readout names the pick); otherwise the knobs shape the selected pad's slot.
 	int32_t pending = pendingDestination();
-	if (pending >= 0) {
-		if (stagingSlot_ < 0) {
-			return; // can't happen while a pick is dialed (the dial claims a staging slot)
-		}
-		Macros::editTargetEndpoint(clip, instrument, heldMacro_, stagingSlot_, whichModEncoder, offset);
-		Macros::showTargetRangeReadout(instrument, heldMacro_, stagingSlot_, (uint8_t)pending, false);
-		Macros::showTargetKnobIndicators(instrument, heldMacro_, stagingSlot_);
+	int32_t slot = (pending >= 0) ? stagingSlot_ : lastSlot_;
+	if (slot < 0) {
 		return;
 	}
-	if (lastSlot_ < 0) {
-		return;
-	}
-	Macros::editTargetEndpoint(clip, instrument, heldMacro_, lastSlot_, whichModEncoder, offset);
-	uint8_t destination = instrument->macros[heldMacro_].targets[lastSlot_].destination;
-	Macros::showTargetRangeReadout(instrument, heldMacro_, lastSlot_, destination, false);
-	Macros::showTargetKnobIndicators(instrument, heldMacro_, lastSlot_);
+	Macros::editTargetEndpoint(clip, instrument, heldMacro_, slot, whichModEncoder, offset);
+	uint8_t destination = (pending >= 0) ? (uint8_t)pending : instrument->macros[heldMacro_].targets[slot].destination;
+	Macros::showTargetRangeReadout(instrument, heldMacro_, slot, destination, false);
+	Macros::showTargetKnobIndicators(instrument, heldMacro_, slot);
 }
