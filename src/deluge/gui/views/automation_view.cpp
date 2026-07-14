@@ -123,8 +123,8 @@ const uint32_t mutePadActionUIModes[] = {UI_MODE_NOTES_PRESSED, UI_MODE_AUDITION
 
 const uint32_t verticalScrollUIModes[] = {UI_MODE_NOTES_PRESSED, UI_MODE_AUDITIONING, UI_MODE_RECORD_COUNT_IN, 0};
 
-constexpr int32_t kNumNonGlobalParamsForAutomation = 83;
-constexpr int32_t kNumGlobalParamsForAutomation = 39;
+constexpr int32_t kNumNonGlobalParamsForAutomation = 84;
+constexpr int32_t kNumGlobalParamsForAutomation = 40;
 
 // synth and kit rows FX - sorted in the order that Parameters are scrolled through on the display
 const std::array<std::pair<params::Kind, ParamType>, kNumNonGlobalParamsForAutomation> nonGlobalParamsForAutomation{{
@@ -153,9 +153,10 @@ const std::array<std::pair<params::Kind, ParamType>, kNumNonGlobalParamsForAutom
     {params::Kind::PATCHED, params::GLOBAL_DELAY_FEEDBACK},
     // Sidechain Shape
     {params::Kind::UNPATCHED_SOUND, params::UNPATCHED_SIDECHAIN_SHAPE},
-    // Decimation, Bitcrush, Wavefolder
+    // Decimation, Bitcrush, Saturation, Wavefolder
     {params::Kind::UNPATCHED_SOUND, params::UNPATCHED_SAMPLE_RATE_REDUCTION},
     {params::Kind::UNPATCHED_SOUND, params::UNPATCHED_BITCRUSHING},
+    {params::Kind::UNPATCHED_SOUND, params::UNPATCHED_SATURATION},
     {params::Kind::PATCHED, params::LOCAL_FOLD},
     // OSC 1 Volume, Pitch, Pulse Width, Carrier Feedback, Wave Index
     {params::Kind::PATCHED, params::LOCAL_OSC_A_VOLUME},
@@ -273,9 +274,10 @@ const std::array<std::pair<params::Kind, ParamType>, kNumGlobalParamsForAutomati
     // Sidechain Send, Shape
     {params::Kind::UNPATCHED_GLOBAL, params::UNPATCHED_SIDECHAIN_VOLUME},
     {params::Kind::UNPATCHED_GLOBAL, params::UNPATCHED_SIDECHAIN_SHAPE},
-    // Decimation, Bitcrush
+    // Decimation, Bitcrush, Saturation
     {params::Kind::UNPATCHED_GLOBAL, params::UNPATCHED_SAMPLE_RATE_REDUCTION},
     {params::Kind::UNPATCHED_GLOBAL, params::UNPATCHED_BITCRUSHING},
+    {params::Kind::UNPATCHED_GLOBAL, params::UNPATCHED_SATURATION},
     // Mod FX Offset, Feedback, Depth, Rate
     {params::Kind::UNPATCHED_GLOBAL, params::UNPATCHED_MOD_FX_OFFSET},
     {params::Kind::UNPATCHED_GLOBAL, params::UNPATCHED_MOD_FX_FEEDBACK},

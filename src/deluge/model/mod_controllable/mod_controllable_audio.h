@@ -86,6 +86,8 @@ public:
 	virtual void ensureInaccessibleParamPresetValuesWithoutKnobsAreZero(Song* song) {} // Song may be NULL
 	bool isBitcrushingEnabled(ParamManager* paramManager);
 	bool isSRREnabled(ParamManager* paramManager);
+	void updateSaturationAmountFromParam(ParamManager* paramManager);
+	static int32_t saturationParamValueFromLegacyClipping(int32_t legacyClippingAmount);
 	bool hasBassAdjusted(ParamManager* paramManager);
 	bool hasTrebleAdjusted(ParamManager* paramManager);
 	ModelStackWithAutoParam* getParamFromMIDIKnob(MIDIKnob& knob, ModelStackWithThreeMainThings* modelStack) override;
@@ -104,7 +106,7 @@ public:
 	StutterConfig stutterConfig;
 
 	bool sampleRateReductionOnLastTime;
-	uint8_t clippingAmount; // Song probably doesn't currently use this?
+	uint8_t clippingAmount; // Cache of the UNPATCHED_SATURATION param, refreshed each render window
 	FilterMode lpfMode;
 	FilterMode hpfMode;
 	FilterRoute filterRoute;
