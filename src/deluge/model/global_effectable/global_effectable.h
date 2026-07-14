@@ -21,6 +21,7 @@
 #include "dsp/filter/filter_set.h"
 #include "model/mod_controllable/mod_controllable_audio.h"
 #include "modulation/arpeggiator.h"
+#include "util/functions.h"
 using namespace deluge;
 class Serializer;
 
@@ -37,6 +38,20 @@ public:
 	                                                bool allowCreation = true) override;
 	void setupFilterSetConfig(int32_t* postFXVolume, ParamManager* paramManager);
 	void processFilters(std::span<StereoSample> buffer);
+
+	int32_t getShiftAmountForSaturation() { return (clippingAmount >= 3) ? (clippingAmount - 3) : 0; }
+
+	/// clipping amount must be greater than 0! Check before calling
+	/// Shift amount is givben by getShiftAmountForSaturation
+	[[gnu::always_inline]] q31_t saturate(q31_t data, uint32_t* workingValue, int32_t shiftAmount) {
+		// Clipping
+		return getTanHAntialiased(data, workingValue, 3 + clippingAmount) << (shiftAmount);
+	}
+
+	/// Refreshes clippingAmount from the UNPATCHED_SATURATION param, then saturates the buffer if it's non-zero
+	void processSaturation(std::span<StereoSample> buffer, ParamManager* paramManager);
+
+	std::array<uint32_t, 2> lastSaturationTanHWorkingValue = {2147483648u, 2147483648u};
 	void compensateVolumeForResonance(ParamManagerForTimeline* paramManager);
 	void processFXForGlobalEffectable(std::span<StereoSample> buffer, int32_t* postFXVolume, ParamManager* paramManager,
 	                                  const Delay::State& delayWorkingState, bool anySoundComingIn, q31_t verbAmount);

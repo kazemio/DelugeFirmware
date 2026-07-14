@@ -75,7 +75,7 @@
 #include "gui/menu_item/filter_route.h"
 #include "gui/menu_item/firmware/version.h"
 #include "gui/menu_item/flash/status.h"
-#include "gui/menu_item/fx/clipping.h"
+#include "gui/menu_item/fx/saturation.h"
 #include "gui/menu_item/gate/mode.h"
 #include "gui/menu_item/gate/off_time.h"
 #include "gui/menu_item/gate/selection.h"
@@ -606,7 +606,7 @@ HorizontalMenu routingHorizontal{STRING_FOR_FILTER_ROUTE, {&filterRoutingMenu}};
 HorizontalMenuGroup filtersMenuGroup{{&lpfMenu, &hpfMenu, &routingHorizontal}};
 
 // FX ----------------------------------------------------------------------------------------
-fx::Clipping clippingMenu{STRING_FOR_SATURATION};
+fx::Saturation clippingMenu{STRING_FOR_SATURATION, params::UNPATCHED_SATURATION, RenderingStyle::BAR};
 UnpatchedParam srrMenu{STRING_FOR_DECIMATION, params::UNPATCHED_SAMPLE_RATE_REDUCTION, RenderingStyle::BAR};
 UnpatchedParam bitcrushMenu{STRING_FOR_BITCRUSH, params::UNPATCHED_BITCRUSHING, RenderingStyle::BAR};
 patched_param::Integer foldMenu{STRING_FOR_WAVEFOLD, STRING_FOR_WAVEFOLD, params::LOCAL_FOLD, RenderingStyle::BAR};
@@ -797,8 +797,9 @@ submenu::ModFxHorizontalMenu globalModFXMenu{
 HorizontalMenu globalDistortionMenu{
     STRING_FOR_DISTORTION,
     {
-        &srrMenu,
+        &clippingMenu,
         &bitcrushMenu,
+        &srrMenu,
     },
 };
 
@@ -1815,7 +1816,7 @@ PLACE_SDRAM_DATA MenuItem* paramShortcutsForSongView[][kDisplayHeight] = {
     {nullptr,                 nullptr,                 nullptr,                        nullptr,                        nullptr,              nullptr,                nullptr,                  nullptr                            },
     {nullptr,                 nullptr,                 nullptr,                        nullptr,                        nullptr,              nullptr,                nullptr,                  nullptr                            },
     {nullptr,                 nullptr,                 nullptr,                        nullptr,                        nullptr,              nullptr,                nullptr,                  &stutterRateMenu                   },
-    {&globalLevelMenu,        nullptr,                 nullptr,                        &globalPanMenu,                 nullptr,              &srrMenu,               &bitcrushMenu,            nullptr                            },
+    {&globalLevelMenu,        nullptr,                 nullptr,                        &globalPanMenu,                 nullptr,              &srrMenu,               &bitcrushMenu,            &clippingMenu                      },
     {nullptr,                 nullptr,                 nullptr,                        nullptr,                        nullptr,              &threshold,             nullptr,                  nullptr                            },
     {nullptr,                 nullptr,                 nullptr,                        nullptr,                        &globalLPFMorphMenu,  &lpfModeMenu,           &globalLPFResMenu,        &globalLPFFreqMenu                 },
     {nullptr,                 nullptr,                 nullptr,                        nullptr,                        &globalHPFMorphMenu,  &hpfModeMenu,           &globalHPFResMenu,        &globalHPFFreqMenu                 },
@@ -1834,7 +1835,7 @@ PLACE_SDRAM_DATA MenuItem* paramShortcutsForKitGlobalFX[][kDisplayHeight] = {
     {nullptr,                 nullptr,                 nullptr,                        nullptr,                        nullptr,                     nullptr,                nullptr,                  nullptr                            },
     {nullptr,                 nullptr,                 nullptr,                        nullptr,                        nullptr,                     nullptr,                nullptr,                  nullptr                            },
     {nullptr,                 nullptr,                 nullptr,                        nullptr,                        nullptr,                     nullptr,                nullptr,                  nullptr             				 },
-    {&globalLevelMenu,        &globalPitchMenu,        nullptr,                        &globalPanMenu,                 nullptr,                     &srrMenu,               &bitcrushMenu,            nullptr                            },
+    {&globalLevelMenu,        &globalPitchMenu,        nullptr,                        &globalPanMenu,                 nullptr,                     &srrMenu,               &bitcrushMenu,            &clippingMenu                      },
     {nullptr,              	 nullptr,                 nullptr,                        nullptr,                        nullptr,                     &threshold,             nullptr,                  nullptr                            },
     {nullptr,                 nullptr,                 nullptr,                        nullptr,                        &globalLPFMorphMenu,         &lpfModeMenu,           &globalLPFResMenu,        &globalLPFFreqMenu                 },
     {nullptr,                 nullptr,                 nullptr,                        nullptr,                        &globalHPFMorphMenu,         &hpfModeMenu,           &globalHPFResMenu,        &globalHPFFreqMenu                 },
