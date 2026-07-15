@@ -1820,7 +1820,10 @@ void View::setModLedStates() {
 				                         : -1;
 				if (macroIndex >= 0) {
 					if (instrument->macros[macroIndex].targets[i].destination != Macros::kNoDestination) {
-						targetConflicted = Macros::targetHasConflict(instrument->macros, macroIndex, i);
+						// a cable-depth target whose cable was deleted blinks like a shadowed one: it's
+						// assigned but drives nothing (re-patching the cable revives it)
+						targetConflicted = Macros::targetHasConflict(instrument->macros, macroIndex, i)
+						                   || Macros::targetCableMissing(clip, instrument->macros, macroIndex, i);
 						targetAssigned = !targetConflicted;
 					}
 				}

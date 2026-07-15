@@ -154,7 +154,9 @@ class MacroTarget final : public IntegerWithOff {
 public:
 	MacroTarget(l10n::String newName, int32_t newMacro, int32_t newSlot)
 	    : IntegerWithOff(newName), macro(newMacro), slot(newSlot) {}
-	[[nodiscard]] int32_t getMaxValue() const override { return Macros::numDestinations(currentMacroDomain(), macro); }
+	[[nodiscard]] int32_t getMaxValue() const override {
+		return Macros::numDestinations(currentMacroDomain(), macro, getCurrentClip());
+	}
 	// Show the destination (OFF / CC number / param or macro name) as text instead of a dial,
 	// unlike Base/Depth.
 	void renderInHorizontalMenu(const SlotPosition& pos) override {
@@ -172,7 +174,7 @@ public:
 			}
 			else if (Macros::isDomainInternal(currentMacroDomain())) {
 				// the param's display name - the canvas clips what doesn't fit the slot
-				Macros::appendDestinationName(str, currentMacroInstrument(), (uint8_t)destination);
+				Macros::appendDestinationName(str, currentMacroInstrument(), (uint16_t)destination);
 			}
 			else {
 				str.appendInt(destination); // the CC number
@@ -191,7 +193,7 @@ public:
 			appendCascadeName(value, v);
 		}
 		else if (Macros::isDomainInternal(currentMacroDomain())) {
-			Macros::appendDestinationName(value, currentMacroInstrument(), (uint8_t)valueToDestination(v));
+			Macros::appendDestinationName(value, currentMacroInstrument(), (uint16_t)valueToDestination(v));
 		}
 		else {
 			value.appendInt(valueToDestination(v));
@@ -209,8 +211,8 @@ public:
 	}
 	void readCurrentValue() override {
 		Macros::Macro* m = currentMacros();
-		uint8_t destination = m ? m[macro].targets[slot].destination : Macros::kNoDestination;
-		// a destination that isn't in this domain's space (position -1) reads as OFF
+		uint16_t destination = m ? m[macro].targets[slot].destination : Macros::kNoDestination;
+		// a destination that isn't in this domain's space (position -1, e.g. a deleted cable) reads as OFF
 		this->setValue((destination == Macros::kNoDestination) ? 0
 		                                                       : std::max<int32_t>(0, destinationToValue(destination)));
 	}
@@ -221,7 +223,7 @@ public:
 		}
 		int32_t value = this->getValue();
 		int32_t resolved = (value == 0) ? -1 : valueToDestination(value);
-		uint8_t destination = (resolved < 0) ? Macros::kNoDestination : (uint8_t)resolved;
+		uint16_t destination = (resolved < 0) ? Macros::kNoDestination : (uint16_t)resolved;
 		if (destination != m[macro].targets[slot].destination) {
 			// clears the old destination's baked lane (no ghost) and bakes the new one, undoably
 			Macros::changeTargetDestination(getCurrentClip(), macro, slot, destination);
@@ -235,7 +237,7 @@ public:
 		Macros::Macro* m = currentMacros();
 		int32_t v = this->getValue();
 		if (m && v != 0) {
-			uint8_t destination = (uint8_t)valueToDestination(v);
+			uint16_t destination = (uint16_t)valueToDestination(v);
 			int32_t owner = Macros::findTargetDestinationOwner(m, destination, macro, slot);
 			if (owner >= 0) {
 				Macros::showDestinationConflictPopup(destination, owner);
@@ -251,10 +253,10 @@ private:
 	// numbers / the targetable param list, then this macro's allowed cascade destinations.
 	bool isCascadeValue(int32_t value) const { return value != 0 && Macros::isMacroParamID(valueToDestination(value)); }
 	int32_t valueToDestination(int32_t value) const {
-		return Macros::destinationForPosition(currentMacroDomain(), macro, value - 1);
+		return Macros::destinationForPosition(currentMacroDomain(), macro, value - 1, getCurrentClip());
 	}
 	int32_t destinationToValue(int32_t destination) const {
-		return Macros::positionForDestination(currentMacroDomain(), macro, destination) + 1;
+		return Macros::positionForDestination(currentMacroDomain(), macro, (uint16_t)destination, getCurrentClip()) + 1;
 	}
 	void appendCascadeName(StringBuf& buf, int32_t value) const {
 		buf.append(deluge::l10n::get(
