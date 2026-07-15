@@ -37,12 +37,15 @@
 #include "modulation/midi/midi_param.h"
 #include "modulation/midi/midi_param_collection.h"
 #include "modulation/midi/midi_param_vector.h"
+#include "modulation/params/param_descriptor.h"
 #include "modulation/params/param_manager.h"
 #include "modulation/params/param_node.h"
 #include "modulation/params/param_set.h"
+#include "modulation/patch/patch_cable_set.h"
 #include "playback/playback_handler.h"
 #include "storage/storage_manager.h"
 #include "util/d_stringbuf.h"
+#include "util/functions.h"
 #include "util/misc.h"
 #include <algorithm>
 #include <string.h>
@@ -60,7 +63,7 @@ bool isEnabled() {
 	return runtimeFeatureSettings.get(RuntimeFeatureSettingType::MacroSystem) == RuntimeFeatureStateToggle::On;
 }
 
-int32_t findTargetDestinationOwner(const Macro* macros, uint8_t destination, int32_t exceptMacro, int32_t exceptSlot,
+int32_t findTargetDestinationOwner(const Macro* macros, uint16_t destination, int32_t exceptMacro, int32_t exceptSlot,
                                    int32_t* slotOut) {
 	if (destination == kNoDestination) {
 		return -1;
@@ -91,7 +94,7 @@ static inline int32_t targetRank(const Macro* macros, int32_t m, int32_t f) {
 
 // The target that owns (drives) `destination` under the rank order above, or -1 if nothing targets it; if
 // non-null, *slotOut receives the owning slot.
-static int32_t findDestinationOwner(const Macro* macros, uint8_t destination, int32_t* slotOut) {
+static int32_t findDestinationOwner(const Macro* macros, uint16_t destination, int32_t* slotOut) {
 	if (destination == kNoDestination) {
 		return -1;
 	}
@@ -115,7 +118,7 @@ static int32_t findDestinationOwner(const Macro* macros, uint8_t destination, in
 	return owner;
 }
 
-int32_t findShadowingOwner(const Macro* macros, uint8_t destination, int32_t macroIndex, int32_t slot) {
+int32_t findShadowingOwner(const Macro* macros, uint16_t destination, int32_t macroIndex, int32_t slot) {
 	if (destination == kNoDestination) {
 		return -1;
 	}
@@ -152,9 +155,16 @@ void markHostEdited(Output* host) {
 }
 
 // Appends a destination's label: "Macro N" for a cascade destination (always the plain macro
-// number, never its user name), the param's display name on a synth track, else the MIDI device's
-// CC name if loaded, else "CC <n>".
-void appendDestinationName(StringBuf& buf, Output* instrument, uint8_t destination) {
+// number, never its user name), the param's display name on a synth track ("<Src>-><Param>" for a
+// cable depth, same format as the gold-knob popup), else the MIDI device's CC name if loaded, else
+// "CC <n>".
+void appendDestinationName(StringBuf& buf, Output* instrument, uint16_t destination) {
+	if (isCableDestination(destination)) {
+		buf.append(sourceToStringShort(cableSource(destination)));
+		buf.append("->");
+		buf.append(params::getParamDisplayName(params::Kind::PATCHED, destinationByte(destination)));
+		return;
+	}
 	if (isMacroParamID(destination)) {
 		buf.append(deluge::l10n::get(static_cast<deluge::l10n::String>(
 		    util::to_underlying(deluge::l10n::String::STRING_FOR_MACRO_1) + macroIndexFromParamID(destination))));
@@ -182,7 +192,7 @@ void appendDestinationName(StringBuf& buf, Output* instrument, uint8_t destinati
 
 // Appends "<destination>\nused by\nMacro N" (OLED) / "<destination> used by Macro N" (7SEG). The destination is
 // resolved against the selected/active clip's instrument, same as the conflict machinery.
-static void appendDestinationUsedBy(StringBuf& buf, uint8_t destination, int32_t ownerMacro) {
+static void appendDestinationUsedBy(StringBuf& buf, uint16_t destination, int32_t ownerMacro) {
 	appendDestinationName(buf, macroHost(midiFollow.getSelectedOrActiveClip()), destination);
 	buf.append(display->haveOLED() ? '\n' : ' ');
 	buf.append(deluge::l10n::get(deluge::l10n::String::STRING_FOR_MACRO_USED_BY)); // "used by"
@@ -192,7 +202,7 @@ static void appendDestinationUsedBy(StringBuf& buf, uint8_t destination, int32_t
 	buf.append(deluge::l10n::get(macroName)); // "Macro N"
 }
 
-void showDestinationConflictPopup(uint8_t destination, int32_t ownerMacro, bool persistent) {
+void showDestinationConflictPopup(uint16_t destination, int32_t ownerMacro, bool persistent) {
 	DEF_STACK_STRING_BUF(popup, 48);
 	appendDestinationUsedBy(popup, destination, ownerMacro); // e.g. "LFO Freq used by" / "Macro 1"
 	if (persistent) {
@@ -205,7 +215,7 @@ void showDestinationConflictPopup(uint8_t destination, int32_t ownerMacro, bool 
 
 // A target's name for its readout: "Macro N" for a cascade destination (always the plain macro number,
 // never its user name), the synth param name / MIDI CC name for a real destination, else "T<n>" when OFF.
-static void appendTargetName(StringBuf& buf, Output* instrument, int32_t target, uint8_t destination) {
+static void appendTargetName(StringBuf& buf, Output* instrument, int32_t target, uint16_t destination) {
 	if (destination == kNoDestination) {
 		buf.append('T');
 		buf.appendInt(target + 1);
@@ -219,11 +229,13 @@ static void appendTargetName(StringBuf& buf, Output* instrument, int32_t target,
 // number the automation view shows for that param. `endpoint` is the stored 0..maxTargetValue unit; for
 // synth that 0..128 space equals the automation view's knobPos+offset, so calculateKnobPosForDisplay
 // yields the identical readout.
-static void appendTargetEndpoint(StringBuf& buf, Output* instrument, uint8_t destination, uint8_t endpoint) {
+static void appendTargetEndpoint(StringBuf& buf, Output* instrument, uint16_t destination, uint8_t endpoint) {
 	if (!isDomainInternal(domainForOutput(instrument))) {
 		buf.appendInt(endpoint); // raw CC value
 		return;
 	}
+	// A cable depth shows the same 0..50 number the gold-knob popup shows for it (PATCH_CABLE kind
+	// takes calculateKnobPosForDisplay's default 0..128 -> 0..50 path, center 25 = no modulation).
 	params::Kind kind;
 	int32_t paramID;
 	decodeDestination(domainForOutput(instrument), destination, &kind, &paramID);
@@ -236,7 +248,10 @@ void showTargetKnobIndicators(Output* instrument, int32_t macroIndex, int32_t ta
 	indicator_leds::setKnobIndicatorLevel(1, f.to, false);
 }
 
-void showTargetRangeReadout(Output* instrument, int32_t macroIndex, int32_t target, uint8_t destination,
+// Forward-declared: defined with the cable helpers below.
+static bool cableExists(Clip* clip, uint16_t destination);
+
+void showTargetRangeReadout(Output* instrument, int32_t macroIndex, int32_t target, uint16_t destination,
                             bool showConflict) {
 	// A shadowed target doesn't drive anything - show WHO owns the destination, not a range.
 	if (showConflict && destination != kNoDestination) {
@@ -245,6 +260,17 @@ void showTargetRangeReadout(Output* instrument, int32_t macroIndex, int32_t targ
 			showDestinationConflictPopup(destination, owner, true); // persistent while held
 			return;
 		}
+	}
+	// A cable-depth target whose cable is gone is inert - say so instead of showing a range that
+	// drives nothing. Re-patching source -> param revives the target (no reassignment needed).
+	if (destination != kNoDestination && isCableDestination(destination)
+	    && !cableExists(getCurrentClip(), destination)) {
+		DEF_STACK_STRING_BUF(popup, 48);
+		appendDestinationName(popup, instrument, destination);
+		popup.append(display->haveOLED() ? '\n' : ' ');
+		popup.append("Cable missing");
+		display->popupText(popup.c_str());
+		return;
 	}
 	MacroTargetSlot& f = instrument->macros[macroIndex].targets[target];
 	DEF_STACK_STRING_BUF(popup, 48);
@@ -283,14 +309,14 @@ bool editTargetEndpoint(Clip* clip, Output* instrument, int32_t macroIndex, int3
 LayerAssignment layerAssignment(const Macro& macro, int32_t primary, int32_t second) {
 	LayerAssignment la;
 	for (int32_t s = 0; s < kNumTargetSlots; s++) {
-		uint8_t d = macro.targets[s].destination;
+		uint16_t d = macro.targets[s].destination;
 		if (d == kNoDestination) {
 			continue;
 		}
-		if (primary >= 0 && d == (uint8_t)primary && la.primarySlot < 0) {
+		if (primary >= 0 && d == (uint16_t)primary && la.primarySlot < 0) {
 			la.primarySlot = s;
 		}
-		if (second >= 0 && d == (uint8_t)second && la.secondSlot < 0) {
+		if (second >= 0 && d == (uint16_t)second && la.secondSlot < 0) {
 			la.secondSlot = s;
 		}
 	}
@@ -388,11 +414,128 @@ Output* macroHost(Clip* clip) {
 	}
 }
 
-// Decodes a destination byte to its (Kind, paramID) on an internal-domain host. SYNTH: bytes below
+// ── Patch-cable depth destinations ──
+// A cable code resolves to the cable's own AutoParam inside the clip's PatchCableSet, addressed by
+// the ParamDescriptor-derived paramId the set itself uses (PatchCableSet::getParamId's encoding).
+// Resolution NEVER creates the cable (unlike the gold-knob/automation edit paths, which pass
+// allowCreation): a macro must not resurrect a deleted cable - the target just goes inert.
+
+// The PatchCableSet paramId for a cable destination code.
+static int32_t cableParamId(uint16_t destination) {
+	ParamDescriptor descriptor;
+	descriptor.setToHaveParamAndSource(destinationByte(destination), cableSource(destination));
+	return descriptor.data;
+}
+
+static PatchCableSet* clipCableSet(Clip* clip) {
+	if (!clip || !clip->paramManager.containsAnyParamCollectionsIncludingExpression()) {
+		return nullptr;
+	}
+	ParamCollectionSummary* summary = clip->paramManager.getPatchCableSetSummary();
+	return (summary && summary->paramCollection) ? (PatchCableSet*)summary->paramCollection : nullptr;
+}
+
+// Whether the cable a destination code names currently exists on the clip.
+static bool cableExists(Clip* clip, uint16_t destination) {
+	PatchCableSet* set = clipCableSet(clip);
+	if (!set) {
+		return false;
+	}
+	ParamDescriptor cableDestination;
+	cableDestination.setToHaveParamOnly(destinationByte(destination));
+	return set->getPatchCableIndex(cableSource(destination), cableDestination) != 255;
+}
+
+bool targetCableMissing(Clip* clip, const Macro* macros, int32_t macroIndex, int32_t slot) {
+	uint16_t destination = macros[macroIndex].targets[slot].destination;
+	return destination != kNoDestination && isCableDestination(destination) && !cableExists(clip, destination);
+}
+
+// The clip's pickable cable-depth destinations: its plain cables (descriptor is just a param - a
+// range-adjusting cable's own depth isn't offered), in PatchCableSet order. SYNTH domain only.
+static int32_t numCableDestinations(Domain domain, Clip* clip) {
+	if (domain != Domain::SYNTH) {
+		return 0;
+	}
+	PatchCableSet* set = clipCableSet(clip);
+	if (!set) {
+		return 0;
+	}
+	int32_t count = 0;
+	for (int32_t c = 0; c < set->numPatchCables; c++) {
+		count += set->patchCables[c].destinationParamDescriptor.isJustAParam();
+	}
+	return count;
+}
+
+// The index-th pickable cable's destination code, or -1 if out of range.
+static int32_t cableDestinationForIndex(Clip* clip, int32_t index) {
+	PatchCableSet* set = clipCableSet(clip);
+	if (!set) {
+		return -1;
+	}
+	for (int32_t c = 0; c < set->numPatchCables; c++) {
+		if (!set->patchCables[c].destinationParamDescriptor.isJustAParam()) {
+			continue;
+		}
+		if (index-- == 0) {
+			return makeCableDestination(set->patchCables[c].destinationParamDescriptor.getJustTheParam(),
+			                            set->patchCables[c].from);
+		}
+	}
+	return -1;
+}
+
+// Resolves a cable destination's AutoParam on the clip into a full model stack, or null if the
+// cable doesn't exist. Never creates the cable (getAutoParamFromId's allowCreation stays false,
+// unlike the gold-knob/automation edit paths).
+static ModelStackWithAutoParam* cableParamStack(ModelStackWithThreeMainThings* three, Clip* clip,
+                                                uint16_t destination) {
+	if (!clip->paramManager.containsAnyParamCollectionsIncludingExpression()) {
+		return nullptr;
+	}
+	ParamCollectionSummary* summary = clip->paramManager.getPatchCableSetSummary();
+	if (!summary || !summary->paramCollection) {
+		return nullptr;
+	}
+	ModelStackWithAutoParam* msp = summary->paramCollection->getAutoParamFromId(
+	    three->addParamCollectionAndId(summary->paramCollection, summary, cableParamId(destination)),
+	    /*allowCreation=*/false);
+	return (msp != nullptr && msp->autoParam != nullptr) ? msp : nullptr;
+}
+
+// The pickable-cable index of a cable destination code, or -1 (including when the cable is gone -
+// a missing cable simply drops out of the dial space).
+static int32_t cableIndexForDestination(Clip* clip, uint16_t destination) {
+	PatchCableSet* set = clipCableSet(clip);
+	if (!set) {
+		return -1;
+	}
+	int32_t index = 0;
+	for (int32_t c = 0; c < set->numPatchCables; c++) {
+		if (!set->patchCables[c].destinationParamDescriptor.isJustAParam()) {
+			continue;
+		}
+		if (set->patchCables[c].from == cableSource(destination)
+		    && set->patchCables[c].destinationParamDescriptor.getJustTheParam() == destinationByte(destination)) {
+			return index;
+		}
+		index++;
+	}
+	return -1;
+}
+
+// Decodes a destination code to its (Kind, paramID) on an internal-domain host. A cable code (SYNTH
+// only) is Kind::PATCH_CABLE with the PatchCableSet paramId. Plain bytes - SYNTH: bytes below
 // UNPATCHED_START are PATCHED ids, bytes from UNPATCHED_START up are UNPATCHED_SOUND ids + offset.
 // GLOBAL: the byte IS the raw UNPATCHED_GLOBAL id (never offset - an offset byte would collide with
 // the cascade id range 128-131). In both, a cascade id addresses the downstream macro's lane param.
-void decodeDestination(Domain domain, uint8_t destination, params::Kind* kindOut, int32_t* idOut) {
+void decodeDestination(Domain domain, uint16_t destination, params::Kind* kindOut, int32_t* idOut) {
+	if (isCableDestination(destination)) {
+		*kindOut = params::Kind::PATCH_CABLE;
+		*idOut = cableParamId(destination);
+		return;
+	}
 	if (domain == Domain::GLOBAL) {
 		*kindOut = params::Kind::UNPATCHED_GLOBAL;
 		*idOut = isMacroParamID(destination) ? params::UNPATCHED_GLOBAL_MACRO_1 + macroIndexFromParamID(destination)
@@ -441,7 +584,7 @@ int32_t internalDestinationForParam(Domain domain, params::Kind kind, int32_t pa
 	return synthDestinationForParam(kind, paramID);
 }
 
-int32_t macroDestinationForPad(Domain domain, int32_t x, int32_t y, bool secondLayer) {
+int32_t macroDestinationForPad(Domain domain, int32_t x, int32_t y, bool secondLayer, Clip* clip) {
 	if (domain == Domain::SYNTH) {
 		// Some patched params share a pad (e.g. LFO1 rate / LFO2 rate); the second layer is reached by
 		// pressing the pad again, mirroring the sound editor. Only patched params have a second layer.
@@ -455,6 +598,18 @@ int32_t macroDestinationForPad(Domain domain, int32_t x, int32_t y, bool secondL
 		if (params::unpatchedNonGlobalParamShortcuts[x][y] != params::kNoParamID) {
 			return synthDestinationForParam(params::Kind::UNPATCHED_SOUND,
 			                                params::unpatchedNonGlobalParamShortcuts[x][y]);
+		}
+		// The two fixed patch-cable shortcut pads (vibrato LFO1->pitch, sidechain->volume) pick that
+		// cable's depth - only while the cable exists on the clip (the pickers offer existing cables
+		// only). Checked after the param grids, matching automation view's pad precedence.
+		if (clip != nullptr && params::isPatchCableShortcut(x, y)) {
+			ParamDescriptor descriptor;
+			params::getPatchCableFromShortcut(x, y, &descriptor);
+			uint16_t destination =
+			    makeCableDestination(descriptor.getJustTheParam(), descriptor.getBottomLevelSource());
+			if (cableExists(clip, destination)) {
+				return destination;
+			}
 		}
 		return -1;
 	}
@@ -480,12 +635,23 @@ bool isParamMacroDriven(Clip* clip, params::Kind kind, int32_t paramID) {
 	if (instrument == nullptr) {
 		return false;
 	}
-	// Encode the automation-view param as a destination byte: internal domains via
-	// internalDestinationForParam; MIDI clips store the CC directly as lastSelectedParamID.
+	// Encode the automation-view param as a destination code: a cable lane (tracked by its
+	// PatchCableSet paramId, i.e. the ParamDescriptor data) becomes a cable code; internal domains
+	// via internalDestinationForParam; MIDI clips store the CC directly as lastSelectedParamID.
 	Domain domain = domainForOutput(clip->output);
-	int32_t destination = isDomainInternal(domain) ? internalDestinationForParam(domain, kind, paramID) : paramID;
-	if (destination < 0 || destination > kMaxMidiDestination) {
-		return false;
+	int32_t destination;
+	if (kind == params::Kind::PATCH_CABLE) {
+		ParamDescriptor descriptor{paramID};
+		if (!descriptor.hasJustOneSource()) {
+			return false; // a range-adjusting cable's own depth is never a macro destination
+		}
+		destination = makeCableDestination(descriptor.getJustTheParam(), descriptor.getBottomLevelSource());
+	}
+	else {
+		destination = isDomainInternal(domain) ? internalDestinationForParam(domain, kind, paramID) : paramID;
+		if (destination < 0 || destination > kMaxMidiDestination) {
+			return false;
+		}
 	}
 	// Any ACTIVE macro targeting this destination is driving the param. (A static macro bakes visible
 	// automation into the target instead, so the caller reaches this only for the live-driven empty-lane
@@ -495,7 +661,7 @@ bool isParamMacroDriven(Clip* clip, params::Kind kind, int32_t paramID) {
 			continue;
 		}
 		for (int32_t f = 0; f < kNumTargetSlots; f++) {
-			if (instrument->macros[m].targets[f].destination == (uint8_t)destination) {
+			if (instrument->macros[m].targets[f].destination == (uint16_t)destination) {
 				return true;
 			}
 		}
@@ -581,15 +747,19 @@ static int32_t numBaseDestinations(Domain domain) {
 	return kMaxMidiDestination + 1;
 }
 
-int32_t numDestinations(Domain domain, int32_t macroIndex) {
-	return numBaseDestinations(domain) + numCascadeDestinations(macroIndex);
+int32_t numDestinations(Domain domain, int32_t macroIndex, Clip* clip) {
+	return numBaseDestinations(domain) + numCascadeDestinations(macroIndex) + numCableDestinations(domain, clip);
 }
 
-int32_t destinationForPosition(Domain domain, int32_t macroIndex, int32_t position) {
-	if (position < 0 || position >= numDestinations(domain, macroIndex)) {
+int32_t destinationForPosition(Domain domain, int32_t macroIndex, int32_t position, Clip* clip) {
+	if (position < 0 || position >= numDestinations(domain, macroIndex, clip)) {
 		return -1;
 	}
 	int32_t numBase = numBaseDestinations(domain);
+	int32_t numCascade = numCascadeDestinations(macroIndex);
+	if (position >= numBase + numCascade) { // the clip's cable depths sit after the cascade ids
+		return cableDestinationForIndex(clip, position - numBase - numCascade);
+	}
 	if (position >= numBase) {
 		return paramIDForMacro(macroIndex) + 1 + (position - numBase);
 	}
@@ -600,8 +770,12 @@ int32_t destinationForPosition(Domain domain, int32_t macroIndex, int32_t positi
 	return position;
 }
 
-int32_t positionForDestination(Domain domain, int32_t macroIndex, uint8_t destination) {
+int32_t positionForDestination(Domain domain, int32_t macroIndex, uint16_t destination, Clip* clip) {
 	int32_t numBase = numBaseDestinations(domain);
+	if (isCableDestination(destination)) {
+		int32_t index = cableIndexForDestination(clip, destination);
+		return (index >= 0) ? numBase + numCascadeDestinations(macroIndex) + index : -1;
+	}
 	if (isMacroParamID(destination)) {
 		int32_t offset = macroIndexFromParamID(destination) - macroIndex - 1;
 		return (offset >= 0) ? numBase + offset : -1;
@@ -623,9 +797,17 @@ bool isValidTargetDestination(Domain domain, int32_t destination, int32_t macroI
 	if (isCascadeDestination(destination, macroIndex)) {
 		return true;
 	}
+	// A cable code is validated structurally (a PATCHED param byte + a real source): whether the
+	// cable currently EXISTS is a per-clip runtime question (files may reference cables of another
+	// preset), answered at write time (skip) and in the UI (targetCableMissing).
+	if (destination > UINT8_MAX) {
+		return domain == Domain::SYNTH && destination <= UINT16_MAX
+		       && destinationByte((uint16_t)destination) < params::UNPATCHED_START
+		       && util::to_underlying(cableSource((uint16_t)destination)) < kNumPatchSources;
+	}
 	if (isDomainInternal(domain)) {
-		return destination >= 0 && destination <= UINT8_MAX
-		       && positionForDestination(domain, macroIndex, (uint8_t)destination) >= 0;
+		return destination >= 0
+		       && positionForDestination(domain, macroIndex, (uint16_t)destination, /*clip=*/nullptr) >= 0;
 	}
 	return destination >= 0 && destination <= kMaxMidiDestination;
 }
@@ -652,7 +834,7 @@ static inline int32_t paramValueToUnits(ModelStackWithAutoParam* msp, Domain dom
 // (reaches the output and records like a manual CC change); SYNTH resolves the param and writes it
 // with the same region/cloning logic, via setValuePossiblyForRegion (which notifies the Sound).
 static void writeDestinationLive(Output* instrument, Clip* clip, ModelStackWithTimelineCounter* modelStack,
-                                 Domain domain, uint8_t destination, int32_t units) {
+                                 Domain domain, uint16_t destination, int32_t units) {
 	if (!isDomainInternal(domain)) {
 		// MIDI hosts are always Instruments (a MIDIInstrument); processParamFromInputMIDIChannel is an
 		// Instrument virtual, not on Output.
@@ -673,10 +855,21 @@ static void writeDestinationLive(Output* instrument, Clip* clip, ModelStackWithT
 			modLength = view.modLength;
 		}
 	}
-	params::Kind kind;
-	int32_t id;
-	decodeDestination(domain, destination, &kind, &id);
-	ModelStackWithAutoParam* msp = instrument->getModelStackWithParam(modelStack, clip, id, kind, true, false);
+	ModelStackWithAutoParam* msp;
+	if (isCableDestination(destination)) {
+		// Resolved directly on the PatchCableSet, never via getModelStackWithParam: that path passes
+		// allowCreation and would resurrect a deleted cable; a missing cable just skips the write. The
+		// set's own knobPos conversion below scales the units onto the cable's bipolar depth.
+		msp = cableParamStack(
+		    modelStack->addOtherTwoThingsButNoNoteRow(instrument->toModControllable(), &clip->paramManager), clip,
+		    destination);
+	}
+	else {
+		params::Kind kind;
+		int32_t id;
+		decodeDestination(domain, destination, &kind, &id);
+		msp = instrument->getModelStackWithParam(modelStack, clip, id, kind, true, false);
+	}
 	if (msp && msp->autoParam) {
 		msp->autoParam->setValuePossiblyForRegion(unitsToParamValue(msp, domain, units), msp, modPos, modLength);
 	}
@@ -726,13 +919,16 @@ static bool getFanContext(Clip* clip, FanContext* ctx) {
 // if it doesn't exist (MIDI CC params are created on demand; synth params always exist). A cascade
 // id resolves to the downstream macro's lane param in either domain.
 static ModelStackWithAutoParam* destinationParamStack(const FanContext& ctx, ModelStackWithThreeMainThings* three,
-                                                      uint8_t destination) {
+                                                      uint16_t destination) {
 	if (ctx.domain == Domain::MIDI) {
 		MIDIParam* param = ctx.coll->params.getParamFromCC(destination);
 		if (!param) {
 			return nullptr;
 		}
 		return three->addParamCollectionAndId(ctx.coll, ctx.summary, destination)->addAutoParam(&param->param);
+	}
+	if (isCableDestination(destination)) {
+		return cableParamStack(three, ctx.clip, destination); // null when the cable is gone: bake skips it
 	}
 	params::Kind kind;
 	int32_t id;
@@ -803,7 +999,7 @@ static void bakeTarget(const FanContext& ctx, ModelStackWithThreeMainThings* thr
 	    unitsToParamValue(modelStackWithParam, ctx.domain, base));
 }
 
-static void refreshAutomationGridIfShowingDestination(Clip* clip, Domain domain, uint8_t destination) {
+static void refreshAutomationGridIfShowingDestination(Clip* clip, Domain domain, uint16_t destination) {
 	if (getRootUI() != &automationView || automationView.onArrangerView) {
 		return;
 	}
@@ -1054,7 +1250,16 @@ static void writeTargetsToFile(Serializer& writer, Macro& macro, Domain domain) 
 			char tagName[10] = MACRO_TARGET_PREFIX "1"; // "target1"
 			tagName[6] = '1' + i;
 			writer.writeOpeningTagBeginning(tagName);
-			if (isDomainInternal(domain)) {
+			if (isCableDestination(target.destination)) {
+				// A cable-depth target: the cable's destination param NAME plus its source, the same
+				// strings the PatchCableSet's own <patchCable> tags use (both version-stable).
+				writer.writeAttribute(
+				    "param",
+				    params::paramNameForFile(params::Kind::UNPATCHED_SOUND, destinationByte(target.destination)),
+				    false);
+				writer.writeAttribute("source", sourceToString(cableSource(target.destination)), false);
+			}
+			else if (isDomainInternal(domain)) {
 				// A cascade target writes the downstream lane's own param name; a real target its param
 				// name. paramNameForFile takes the UNPATCHED_START-offset byte, so GLOBAL (whose bytes are
 				// raw ids) adds the offset back on.
@@ -1130,10 +1335,14 @@ static void readTargetFromFile(Deserializer& reader, MacroTargetSlot& target, in
 	int32_t destination = kNoDestination;
 	int32_t from = kDefaultFrom;
 	int32_t to = kDefaultTo;
+	PatchSource cableFrom = PatchSource::NONE; // a source attribute makes a SYNTH param a cable-depth target
 	char const* attrName;
 	while (*(attrName = reader.readNextTagOrAttributeName())) {
 		if (!strcmp(attrName, "cc") && domain == Domain::MIDI) {
 			destination = reader.readTagOrAttributeValueInt();
+		}
+		else if (!strcmp(attrName, "source") && domain == Domain::SYNTH) {
+			cableFrom = stringToSource(reader.readTagOrAttributeValue());
 		}
 		else if (!strcmp(attrName, "param") && domain == Domain::SYNTH) {
 			// name -> absolute byte; failures return GLOBAL_NONE, which the validity check below
@@ -1166,6 +1375,12 @@ static void readTargetFromFile(Deserializer& reader, MacroTargetSlot& target, in
 			to = reader.readTagOrAttributeValueInt();
 		}
 		reader.exitTag();
+	}
+	// param + source names a cable's depth: combine them into the cable code (attribute order in the
+	// file doesn't matter - both were collected above). Only a PATCHED param byte can carry a source.
+	if (domain == Domain::SYNTH && cableFrom != PatchSource::NONE && destination >= 0
+	    && destination < params::UNPATCHED_START) {
+		destination = makeCableDestination(destination, cableFrom);
 	}
 	// a real destination, or a cascade (higher-indexed macro only - keeps the graph acyclic)
 	target.destination = isValidTargetDestination(domain, destination, macroIndex) ? destination : kNoDestination;
@@ -1341,7 +1556,7 @@ void reFanTarget(Clip* clip, int32_t macroIndex, int32_t slot, Action* action) {
 	markHostEdited(ctx.instrument);
 }
 
-void changeTargetDestination(Clip* clip, int32_t macroIndex, int32_t slot, uint8_t newDestination) {
+void changeTargetDestination(Clip* clip, int32_t macroIndex, int32_t slot, uint16_t newDestination) {
 	FanContext ctx;
 	if (!getFanContext(clip, &ctx)) {
 		return;
@@ -1353,7 +1568,7 @@ void changeTargetDestination(Clip* clip, int32_t macroIndex, int32_t slot, uint8
 		return;
 	}
 	MacroTargetSlot& target = ctx.instrument->macros[macroIndex].targets[slot];
-	uint8_t oldDestination = target.destination;
+	uint16_t oldDestination = target.destination;
 	if (newDestination == oldDestination) {
 		return;
 	}
@@ -1465,7 +1680,7 @@ void setMacroActive(Clip* clip, int32_t macroIndex, bool active) {
 	        ->addOtherTwoThings(ctx.instrument->toModControllable(), &clip->paramManager);
 
 	for (int32_t slot = 0; slot < kNumTargetSlots; slot++) {
-		uint8_t destination = macros[macroIndex].targets[slot].destination;
+		uint16_t destination = macros[macroIndex].targets[slot].destination;
 		if (destination == kNoDestination) {
 			continue;
 		}
@@ -1503,6 +1718,61 @@ void setMacroActive(Clip* clip, int32_t macroIndex, bool active) {
 		}
 		reFanTarget(clip, newOwnerMacro, newOwnerSlot, action);
 	}
+}
+
+// ── Sound-editor mod-matrix entry point ──
+
+int32_t destinationForDescriptor(ParamDescriptor descriptor) {
+	if (descriptor.isNull()) {
+		return -1;
+	}
+	if (descriptor.isJustAParam()) {
+		return synthDestinationForParam(params::Kind::PATCHED, descriptor.getJustTheParam());
+	}
+	if (!descriptor.hasJustOneSource()) {
+		return -1; // a depth-of-depth descriptor - not a macro destination
+	}
+	return makeCableDestination(descriptor.getJustTheParam(), descriptor.getBottomLevelSource());
+}
+
+// The slot of `macro` holding this destination, or -1. (Passing kNoDestination finds the first free slot.)
+static int32_t slotForDestination(const Macro& macro, uint16_t destination) {
+	for (int32_t s = 0; s < kNumTargetSlots; s++) {
+		if (macro.targets[s].destination == destination) {
+			return s;
+		}
+	}
+	return -1;
+}
+
+bool isMenuTargetAssigned(Clip* clip, int32_t macroIndex, ParamDescriptor descriptor) {
+	Output* instrument = macroHost(clip);
+	int32_t destination = destinationForDescriptor(descriptor);
+	return instrument != nullptr && destination >= 0
+	       && slotForDestination(instrument->macros[macroIndex], (uint16_t)destination) >= 0;
+}
+
+MenuTargetToggle toggleMenuTarget(Clip* clip, int32_t macroIndex, ParamDescriptor descriptor) {
+	Output* instrument = macroHost(clip);
+	int32_t destination = destinationForDescriptor(descriptor);
+	if (instrument == nullptr || domainForOutput(clip->output) != Domain::SYNTH || destination < 0) {
+		return MenuTargetToggle::INVALID;
+	}
+	Macro& macro = instrument->macros[macroIndex];
+	int32_t slot = slotForDestination(macro, (uint16_t)destination);
+	if (slot >= 0) { // already a target: toggle it OFF (clears its bake, undoably, like any other clear)
+		changeTargetDestination(clip, macroIndex, slot, kNoDestination);
+		return MenuTargetToggle::REMOVED;
+	}
+	if (isCableDestination((uint16_t)destination) && !cableExists(clip, (uint16_t)destination)) {
+		return MenuTargetToggle::CABLE_MISSING; // only an existing cable's depth can be picked
+	}
+	slot = slotForDestination(macro, kNoDestination); // first free slot
+	if (slot < 0) {
+		return MenuTargetToggle::SLOTS_FULL;
+	}
+	changeTargetDestination(clip, macroIndex, slot, (uint16_t)destination);
+	return MenuTargetToggle::ADDED;
 }
 
 } // namespace Macros
