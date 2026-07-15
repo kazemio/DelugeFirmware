@@ -234,8 +234,12 @@ static void appendTargetEndpoint(StringBuf& buf, Output* instrument, uint16_t de
 		buf.appendInt(endpoint); // raw CC value
 		return;
 	}
-	// A cable depth shows the same 0..50 number the gold-knob popup shows for it (PATCH_CABLE kind
-	// takes calculateKnobPosForDisplay's default 0..128 -> 0..50 path, center 25 = no modulation).
+	// A cable depth shows the strength menu's own -50..+50 scale (0 = no modulation), so the
+	// endpoints read in the same terms the user set the cable's depth in.
+	if (isCableDestination(destination)) {
+		buf.appendInt(((int32_t)endpoint - 64) * 50 / 64);
+		return;
+	}
 	params::Kind kind;
 	int32_t paramID;
 	decodeDestination(domainForOutput(instrument), destination, &kind, &paramID);
@@ -816,14 +820,30 @@ bool isValidTargetDestination(Domain domain, int32_t destination, int32_t macroI
 // Macro endpoints and outputs live in "units": CC values 0..127 on MIDI, knob positions 0..128 on
 // synths. MIDI converts with the fixed (v-64)<<25 mapping; synths route through the destination
 // collection's own conversions so bipolar params (pan) and per-param overrides scale correctly.
+// Cable DEPTH is the exception: its value space is signed -(2^30)..2^30 with 0 = no modulation
+// (see PatchCableStrength::readCurrentValue) - NOT what the PatchCableSet's knobPos conversion
+// returns - so it gets its own fixed mapping, units 0..128 -> full-negative..full-positive.
+static inline bool paramIsCableDepth(ModelStackWithAutoParam* msp) {
+	return msp->paramCollection->getParamKind() == params::Kind::PATCH_CABLE;
+}
 static inline int32_t unitsToParamValue(ModelStackWithAutoParam* msp, Domain domain, int32_t units) {
 	if (isDomainInternal(domain)) {
+		if (paramIsCableDepth(msp)) {
+			int32_t value = (units - 64) << 24; // -(2^30)..2^30, center unit 64 = 0
+			// NEVER write exactly 0: the engine deletes any cable whose value hits 0 with no
+			// automation (PatchCableSet::notifyParamModifiedInSomeWay), which would permanently kill
+			// the cable this macro drives. A value of 1 (a 2^-30 depth) is inaudibly identical.
+			return (value == 0) ? 1 : value;
+		}
 		return msp->paramCollection->knobPosToParamValue(units - 64, msp);
 	}
 	return (units - 64) << 25;
 }
 static inline int32_t paramValueToUnits(ModelStackWithAutoParam* msp, Domain domain, int32_t value) {
 	if (isDomainInternal(domain)) {
+		if (paramIsCableDepth(msp)) {
+			return std::clamp<int32_t>(((value + (1 << 23)) >> 24) + 64, 0, (int32_t)kMaxValueInternal);
+		}
 		return std::clamp<int32_t>(msp->paramCollection->paramValueToKnobPos(value, msp) + 64, 0,
 		                           (int32_t)kMaxValueInternal);
 	}
@@ -972,11 +992,21 @@ static void bakeTarget(const FanContext& ctx, ModelStackWithThreeMainThings* thr
                        AutoParam* source, Action* action) {
 	ModelStackWithAutoParam* modelStackWithParam = destinationParamStack(ctx, three, target.destination);
 	if (!modelStackWithParam) {
-		return; // never existed (MIDI): nothing to clear
+		return; // never existed (MIDI) or the cable is gone: nothing to clear
 	}
 
 	// Overwrite: clear first (deleteAutomation snapshots into `action` for undo when given).
 	modelStackWithParam->autoParam->deleteAutomation(action, modelStackWithParam, false);
+
+	// Deleting a cable's automation can leave its value at 0, which triggers the engine's
+	// delete-at-zero cable cleanup - and that memcpys another cable over the AutoParam we hold.
+	// Re-resolve before writing; if the cable just got culled, there's nothing to bake into.
+	if (isCableDestination(target.destination)) {
+		modelStackWithParam = destinationParamStack(ctx, three, target.destination);
+		if (!modelStackWithParam) {
+			return;
+		}
+	}
 
 	// An AUTOMATED lane is driven live from the lane each playback tick by applyMacroLaneAutomation, so
 	// baking its curve into the target too would be redundant (and leave stale target automation) - we
@@ -1583,6 +1613,16 @@ void changeTargetDestination(Clip* clip, int32_t macroIndex, int32_t slot, uint1
 		// real destination keeps from/to: you're moving the same mapping, not clearing it.)
 		target.from = kDefaultFrom;
 		target.to = kDefaultTo;
+	}
+	// A FRESH cable-depth assignment defaults to "macro dials the modulation in": macro at 0 = no
+	// modulation (center 64), macro at max = full positive depth. The pass-through default (0..127)
+	// would make macro-at-0 mean FULL NEGATIVE depth - never what you want as a starting point on a
+	// bipolar scaler. Only when the range is still pristine: a range shaped during the pick (the
+	// overlay's staging slot) or carried over by a repoint is the user's, keep it.
+	else if (isCableDestination(newDestination) && oldDestination == kNoDestination && target.from == kDefaultFrom
+	         && target.to == kDefaultTo) {
+		target.from = 64;
+		target.to = kMaxValueInternal;
 	}
 
 	if (!laneEverTouched(ctx, macroIndex)) {
