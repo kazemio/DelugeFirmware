@@ -803,12 +803,12 @@ void AutomationView::renderAutomationOverview(ModelStackWithTimelineCounter* mod
 		// it's this pad's PRIMARY param, yellow if it's the shared second-layer param (matching the
 		// second layer's colour elsewhere); pads that can't be a destination go dark.
 		if (macroPicker) {
-			int32_t destination = Macros::macroDestinationForPad(pickerDomain, xDisplay, yDisplay);
+			int32_t destination = Macros::macroDestinationForPad(pickerDomain, xDisplay, yDisplay, false, clip);
 			if (destination < 0) {
 				pixel = colours::black;
 			}
 			else {
-				int32_t second = Macros::macroDestinationForPad(pickerDomain, xDisplay, yDisplay, true);
+				int32_t second = Macros::macroDestinationForPad(pickerDomain, xDisplay, yDisplay, true, clip);
 				if (heldTargetPendingDestination == destination) {
 					pixel = colours::white_full; // primary layer picked
 				}
@@ -2585,7 +2585,7 @@ void AutomationView::modButtonAction(uint8_t whichButton, bool on) {
 		macroPickerLastX = -1; // start a fresh picker hold: no "same pad again" carried over
 		macroPickerLastY = -1;
 		macroPickerSecondLayer = false;
-		uint8_t destination = instrument->macros[macroIndex].targets[whichButton].destination;
+		uint16_t destination = instrument->macros[macroIndex].targets[whichButton].destination;
 		heldTargetPendingDestination = (destination == Macros::kNoDestination) ? -1 : destination;
 		// initial press: an in-use target reads out who owns its destination
 		Macros::showTargetRangeReadout(instrument, macroIndex, whichButton, destination, true);
@@ -2608,8 +2608,8 @@ void AutomationView::commitHeldTargetDestination() {
 	if (instrument == nullptr || macroIndex != heldTargetMacro) {
 		return; // lane changed mid-hold: drop the pending value rather than commit to the wrong macro
 	}
-	uint8_t newDestination =
-	    (heldTargetPendingDestination < 0) ? Macros::kNoDestination : (uint8_t)heldTargetPendingDestination;
+	uint16_t newDestination =
+	    (heldTargetPendingDestination < 0) ? Macros::kNoDestination : (uint16_t)heldTargetPendingDestination;
 	if (newDestination != instrument->macros[macroIndex].targets[heldTarget].destination) {
 		Macros::changeTargetDestination(clip, macroIndex, heldTarget, newDestination);
 	}
@@ -2637,7 +2637,8 @@ void AutomationView::handleMacroPickerPad(Clip* clip, int32_t x, int32_t y) {
 	Macros::Domain domain = Macros::domainForOutput(clip->output);
 	// Pressing the SAME pad again reaches the param that shares that shortcut (e.g. LFO1->LFO2 rate),
 	// like the sound editor's second-layer cycling. A different pad resets to the primary.
-	if (x == macroPickerLastX && y == macroPickerLastY && Macros::macroDestinationForPad(domain, x, y, true) >= 0) {
+	if (x == macroPickerLastX && y == macroPickerLastY
+	    && Macros::macroDestinationForPad(domain, x, y, true, clip) >= 0) {
 		macroPickerSecondLayer = !macroPickerSecondLayer;
 	}
 	else {
@@ -2645,13 +2646,13 @@ void AutomationView::handleMacroPickerPad(Clip* clip, int32_t x, int32_t y) {
 	}
 	macroPickerLastX = x;
 	macroPickerLastY = y;
-	int32_t destination = Macros::macroDestinationForPad(domain, x, y, macroPickerSecondLayer);
+	int32_t destination = Macros::macroDestinationForPad(domain, x, y, macroPickerSecondLayer, clip);
 	if (destination < 0) {
 		return; // a dark pad - not a pickable destination
 	}
 	heldTargetPendingDestination = (int16_t)destination;
-	Macros::showTargetRangeReadout(instrument, macroIndex, heldTarget, (uint8_t)destination, false);
-	bool wouldDrive = Macros::findShadowingOwner(instrument->macros, (uint8_t)destination, macroIndex, heldTarget) < 0;
+	Macros::showTargetRangeReadout(instrument, macroIndex, heldTarget, (uint16_t)destination, false);
+	bool wouldDrive = Macros::findShadowingOwner(instrument->macros, (uint16_t)destination, macroIndex, heldTarget) < 0;
 	indicator_leds::setLedState(indicator_leds::modLed[heldTarget], wouldDrive);
 	uiNeedsRendering(&automationView, 0xFFFFFFFF, 0); // move the white pick highlight
 }
@@ -2955,16 +2956,16 @@ void AutomationView::selectEncoderAction(int8_t offset) {
 			// higher-indexed macros it may target, shown as "Macro N"). Destination bytes aren't
 			// contiguous per-macro, so step in "dial position" space.
 			Macros::Domain domain = Macros::domainForOutput(output);
-			int32_t maxPosition = Macros::numDestinations(domain, macroIndex) - 1;
+			int32_t maxPosition = Macros::numDestinations(domain, macroIndex, clip) - 1;
 			int32_t position =
 			    (heldTargetPendingDestination < 0)
 			        ? -1
-			        : Macros::positionForDestination(domain, macroIndex, (uint8_t)heldTargetPendingDestination);
+			        : Macros::positionForDestination(domain, macroIndex, (uint16_t)heldTargetPendingDestination, clip);
 			position = std::clamp<int32_t>(position + offset, -1, maxPosition);
 			heldTargetPendingDestination =
-			    (position < 0) ? -1 : Macros::destinationForPosition(domain, macroIndex, position);
-			uint8_t pendingDestination =
-			    (heldTargetPendingDestination < 0) ? Macros::kNoDestination : (uint8_t)heldTargetPendingDestination;
+			    (position < 0) ? -1 : Macros::destinationForPosition(domain, macroIndex, position, clip);
+			uint16_t pendingDestination =
+			    (heldTargetPendingDestination < 0) ? Macros::kNoDestination : (uint16_t)heldTargetPendingDestination;
 			// Dialing stays normal even onto an in-use destination (pick it, then shape From/To with
 			// the gold knobs); only the LED hints it won't drive, and it blinks after release.
 			Macros::showTargetRangeReadout(instrument, macroIndex, heldTarget, pendingDestination, false);

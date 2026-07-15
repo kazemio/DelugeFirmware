@@ -17,15 +17,18 @@
 
 #pragma once
 
+#include "definitions_cxx.hpp"
 #include "io/midi/learned_midi.h"
 #include "modulation/params/param.h"
 #include "util/d_string.h"
+#include "util/misc.h"
 #include <cstdint>
 
 class MIDICable;
 class Action;
 class Clip;
 class Output;
+class ParamDescriptor;
 class ModelStackWithTimelineCounter;
 // Reference-only in this header, so forward-declared rather than pulling storage_manager.h in (this
 // header is included by the core output.h).
@@ -45,7 +48,14 @@ namespace Macros {
 
 constexpr int32_t kNumMacros = 4;
 constexpr int32_t kNumTargetSlots = 8;
-constexpr uint8_t kNoDestination = 255;
+// A destination is a 16-bit code. The LOW byte is the per-domain byte space documented on Domain
+// below - plain destinations keep their whole value in it (high byte 0), so everything keyed on
+// integer equality (ownership, shadowing, cascades, dedupe) sees them unchanged. A non-zero HIGH
+// byte holds a PatchSource + 1 and makes the code a PATCH-CABLE DEPTH destination (SYNTH domain
+// only): the target drives the depth of the clip's existing cable source -> (low-byte PATCHED
+// param) - the same AutoParam gold knobs and automation lanes edit. Only a cable that exists can
+// be driven; a target whose cable was deleted goes inert (the UI flags it) and never re-creates it.
+constexpr uint16_t kNoDestination = 255; // 0x00FF: high byte 0, so never mistaken for a cable code
 constexpr uint8_t kMaxMidiDestination = 127;
 constexpr uint8_t kMaxValue = 127;  // from/to and CC output range, and the source value range
 constexpr uint8_t kDefaultFrom = 0; // output at source = 0
@@ -131,12 +141,31 @@ inline bool isCascadeDestination(int32_t destination, int32_t macroIndex) {
 	return isMacroParamID(destination) && macroIndexFromParamID(destination) > macroIndex;
 }
 
+// ── Patch-cable depth destinations (SYNTH domain) ──
+// The 16-bit cable code: low byte = the cable's destination PATCHED param, high byte = the cable's
+// source + 1 (0 = "no source", i.e. a plain destination - see kNoDestination). Decodes to
+// Kind::PATCH_CABLE with the ParamDescriptor-derived paramId the PatchCableSet resolves
+// (PatchCableSet::getParamId's encoding), so the whole write/bake path lands on the cable's own
+// AutoParam.
+inline bool isCableDestination(uint16_t destination) {
+	return (destination >> 8) != 0;
+}
+inline uint8_t destinationByte(uint16_t destination) {
+	return destination & 0xFF;
+}
+inline PatchSource cableSource(uint16_t destination) {
+	return static_cast<PatchSource>((destination >> 8) - 1);
+}
+inline uint16_t makeCableDestination(int32_t patchedParamID, PatchSource source) {
+	return (uint16_t)patchedParamID | (uint16_t)((util::to_underlying(source) + 1) << 8);
+}
+
 // ── Destination byte space ──
-// Internal-domain destination byte <-> (Kind, paramID). Cascade ids (128-131) decode to the
+// Internal-domain destination code <-> (Kind, paramID). Cascade ids (128-131) decode to the
 // downstream macro's own lane param, which is where a cascade bake writes. SYNTH and GLOBAL encode
 // the byte differently (see the .cpp); the byte value alone is domain-ambiguous, so always pass the
 // clip's domain.
-void decodeDestination(Domain domain, uint8_t destination, deluge::modulation::params::Kind* kindOut, int32_t* idOut);
+void decodeDestination(Domain domain, uint16_t destination, deluge::modulation::params::Kind* kindOut, int32_t* idOut);
 // The byte for a SYNTH (kind, param) pair, or -1 if the pair isn't a valid macro destination (only
 // PATCHED and UNPATCHED_SOUND params are, and never the macro lane params themselves).
 int32_t synthDestinationForParam(deluge::modulation::params::Kind kind, int32_t paramID);
@@ -144,10 +173,12 @@ int32_t synthDestinationForParam(deluge::modulation::params::Kind kind, int32_t 
 // by domain (SYNTH -> synthDestinationForParam; GLOBAL -> raw UNPATCHED_GLOBAL id, lanes excluded).
 int32_t internalDestinationForParam(Domain domain, deluge::modulation::params::Kind kind, int32_t paramID);
 
-// Resolves a main-grid pad (x,y) to the destination byte it would pick in this domain, or -1 if the pad
+// Resolves a main-grid pad (x,y) to the destination code it would pick in this domain, or -1 if the pad
 // can't be a macro target. SYNTH reads the const param-shortcut grids (+ the shared second layer); MIDI
 // reads midiFollow's cached CC-per-pad grid. Shared by the automation-lane picker and note-view picker.
-int32_t macroDestinationForPad(Domain domain, int32_t x, int32_t y, bool secondLayer = false);
+// With a clip given, the two fixed patch-cable shortcut pads (vibrato, sidechain) resolve to their
+// cable-depth code when that cable exists on the clip.
+int32_t macroDestinationForPad(Domain domain, int32_t x, int32_t y, bool secondLayer = false, Clip* clip = nullptr);
 
 // True if the given param (as selected in automation view) is a target of an ACTIVE macro on this clip -
 // i.e. its value is being driven by a macro rather than its own automation. Used for the automation
@@ -159,11 +190,14 @@ bool isParamMacroDriven(Clip* clip, deluge::modulation::params::Kind kind, int32
 uint8_t laneDestination(Domain domain, int32_t macroIndex);
 
 // A macro's destinations form one contiguous dial/position space per domain: MIDI = CC 0..127 then
-// this macro's cascade ids; SYNTH = the targetable param list (automation-view order) then the
-// cascade ids. Used by the quick-edit dial and the menu picker.
-int32_t numDestinations(Domain domain, int32_t macroIndex);
-int32_t destinationForPosition(Domain domain, int32_t macroIndex, int32_t position);    // -1 if out of range
-int32_t positionForDestination(Domain domain, int32_t macroIndex, uint8_t destination); // -1 if not in the space
+// this macro's cascade ids; SYNTH = the targetable param list (automation-view order), the cascade
+// ids, then - when a clip is given - the depths of the clip's existing plain patch cables. Used by
+// the quick-edit dial and the menu picker. The cable section is per-clip and shifts as cables come
+// and go, which is fine: targets are stored by destination code, never by position.
+int32_t numDestinations(Domain domain, int32_t macroIndex, Clip* clip);
+int32_t destinationForPosition(Domain domain, int32_t macroIndex, int32_t position, Clip* clip); // -1 if outside
+int32_t positionForDestination(Domain domain, int32_t macroIndex, uint16_t destination,
+                               Clip* clip); // -1 if not in the space (e.g. a cable that no longer exists)
 
 // Whether `destination` may be assigned as a target of macros[macroIndex] in this domain: a real CC (MIDI),
 // a targetable param byte (SYNTH - never the lane bytes 117-120), or a higher-indexed cascade id.
@@ -174,8 +208,9 @@ inline bool isValidTargetDestination(int32_t destination, int32_t macroIndex) {
 }
 
 // Appends a destination's display label: "Macro N" for a cascade id, the param name on a synth
-// track, else the MIDI device's CC name if loaded, else "CC <n>".
-void appendDestinationName(StringBuf& buf, Output* instrument, uint8_t destination);
+// track ("<Src>-><Param>" for a cable depth, mirroring the gold-knob popup), else the MIDI device's
+// CC name if loaded, else "CC <n>".
+void appendDestinationName(StringBuf& buf, Output* instrument, uint16_t destination);
 
 // If an automation-lane selection (kind, paramID) on this output is a macro lane, returns the
 // macro index, else -1. MIDI lanes are the pseudo-CC ids 128-131 (their clips track lanes by id
@@ -186,9 +221,9 @@ int32_t macroIndexForLaneSelection(Output* output, deluge::modulation::params::K
 //   out = clamp(from + (to - from) * input / 127, 0, 127)
 // Set from > to to invert the response; from == to sends a constant.
 struct MacroTargetSlot {
-	uint8_t destination = kNoDestination; // kNoDestination = OFF, else 0..kMaxMidiDestination
-	uint8_t from = kDefaultFrom;          // 0..kMaxValue, output when source is at 0
-	uint8_t to = kDefaultTo;              // 0..kMaxValue, output when source is at 127 (from>to inverts)
+	uint16_t destination = kNoDestination; // kNoDestination = OFF, else a destination code (see kNoDestination)
+	uint8_t from = kDefaultFrom;           // 0..kMaxValue, output when source is at 0
+	uint8_t to = kDefaultTo;               // 0..kMaxValue, output when source is at 127 (from>to inverts)
 };
 
 struct Macro {
@@ -207,7 +242,7 @@ bool isEnabled();
 // Returns the index of a macro (other than macros[exceptMacro], and other than the given slot) whose
 // target already targets this CC, or -1 if none; if non-null, *slotOut receives that target's
 // slot. Duplicate destination CCs are allowed but flagged.
-int32_t findTargetDestinationOwner(const Macro* macros, uint8_t destination, int32_t exceptMacro, int32_t exceptSlot,
+int32_t findTargetDestinationOwner(const Macro* macros, uint16_t destination, int32_t exceptMacro, int32_t exceptSlot,
                                    int32_t* slotOut = nullptr);
 
 // The OWNER of a destination CC is the target that drives it - it alone bakes automation and sends
@@ -219,9 +254,9 @@ int32_t findTargetDestinationOwner(const Macro* macros, uint8_t destination, int
 // re-bakes accordingly. Returns the macro owning `destination` if macros[macroIndex].targets[slot] holding
 // it would be shadowed, or -1 if that position would be the owner (destination may be a pending value the
 // slot doesn't hold yet).
-int32_t findShadowingOwner(const Macro* macros, uint8_t destination, int32_t macroIndex, int32_t slot);
+int32_t findShadowingOwner(const Macro* macros, uint16_t destination, int32_t macroIndex, int32_t slot);
 inline bool isTargetShadowed(const Macro* macros, int32_t macroIndex, int32_t slot) {
-	uint8_t destination = macros[macroIndex].targets[slot].destination;
+	uint16_t destination = macros[macroIndex].targets[slot].destination;
 	return destination != kNoDestination && findShadowingOwner(macros, destination, macroIndex, slot) >= 0;
 }
 
@@ -229,16 +264,36 @@ inline bool isTargetShadowed(const Macro* macros, int32_t macroIndex, int32_t sl
 // the UI flags with a blinking target-button LED.
 bool targetHasConflict(const Macro* macros, int32_t macroIndex, int32_t slot);
 
+// True when the slot is a patch-cable depth target whose cable no longer exists on this clip: the
+// target is inert (skipped by every write - it never re-creates the cable) until the user re-patches
+// source -> param, which revives it automatically. The UI flags these like shadowed targets.
+bool targetCableMissing(Clip* clip, const Macro* macros, int32_t macroIndex, int32_t slot);
+
+// ── Sound-editor mod-matrix entry point ──
+// The "Modulate with" / "Modulate depth" source menus offer the four macros after the real patch
+// sources; picking one toggles the menu's destination as a target of that macro. The descriptor is
+// the menu's own getDestinationDescriptor(): just-a-param = a plain PATCHED destination, one source
+// = that cable's depth (which must exist to be added).
+enum class MenuTargetToggle : uint8_t { ADDED, REMOVED, SLOTS_FULL, CABLE_MISSING, INVALID };
+// The destination code for a source-menu descriptor, or -1 if it can't be a macro target (e.g. a
+// two-source descriptor, or a param outside the targetable set).
+int32_t destinationForDescriptor(ParamDescriptor descriptor);
+// Whether macros[macroIndex] already targets this descriptor on the clip.
+bool isMenuTargetAssigned(Clip* clip, int32_t macroIndex, ParamDescriptor descriptor);
+// Toggles the assignment (first free slot on add), with the same bake/clear semantics as any other
+// picker - see changeTargetDestination().
+MenuTargetToggle toggleMenuTarget(Clip* clip, int32_t macroIndex, ParamDescriptor descriptor);
+
 // Shows a "<destination> used by Macro <ownerMacro+1>" popup (destination = device CC name or "CC n"), used by the
 // quick-edit target readout when the held slot is shadowed. `persistent` keeps it up until
 // cancelPopup() (used while a quick-edit button is held).
-void showDestinationConflictPopup(uint8_t destination, int32_t ownerMacro, bool persistent = false);
+void showDestinationConflictPopup(uint16_t destination, int32_t ownerMacro, bool persistent = false);
 
 // Persistent held-target readout: the destination name then the "From - To" range (synth params in
 // their menu range 0-50/-25..+25, MIDI CCs raw 0-127), or "Target Assign" when the slot is OFF. On
 // showConflict, an in-use (shadowed) target shows its owner instead of a range. Shared by the
 // automation-lane quick-edit editor and the note-view target picker.
-void showTargetRangeReadout(Output* instrument, int32_t macroIndex, int32_t target, uint8_t destination,
+void showTargetRangeReadout(Output* instrument, int32_t macroIndex, int32_t target, uint16_t destination,
                             bool showConflict);
 // Seeds the gold-knob LED bars to the target's From (knob 0) / To (knob 1) while its button is held.
 void showTargetKnobIndicators(Output* instrument, int32_t macroIndex, int32_t target);
@@ -310,7 +365,7 @@ void reFanTarget(Clip* clip, int32_t macroIndex, int32_t slot, Action* action);
 // Repoints a target at a new destination CC: clears the bake left on the old CC (so no ghost lane
 // keeps playing) unless another target still targets it, then bakes the macro curve into the new CC.
 // Both writes are snapshotted into one undo action, so BACK restores any automation this replaced.
-void changeTargetDestination(Clip* clip, int32_t macroIndex, int32_t slot, uint8_t newDestination);
+void changeTargetDestination(Clip* clip, int32_t macroIndex, int32_t slot, uint16_t newDestination);
 
 // Flips macros[macroIndex].active. Ownership of a duplicated CC ranks active macros first, so a
 // flip can hand a contested CC between macros: the old owner's bake is cleared and the new owner's

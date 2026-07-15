@@ -34,7 +34,7 @@ MacroTargetAssignOverlay macroTargetAssignOverlay{};
 
 static bool macroTargets(const Macros::Macro& macro, int32_t destination) {
 	for (const Macros::MacroTargetSlot& target : macro.targets) {
-		if (target.destination == (uint8_t)destination) {
+		if (target.destination == (uint16_t)destination) {
 			return true;
 		}
 	}
@@ -79,7 +79,7 @@ int32_t MacroTargetAssignOverlay::pendingDestination() const {
 	if (instrument == nullptr) {
 		return -1;
 	}
-	return Macros::destinationForPosition(Macros::domainForOutput(clip->output), heldMacro_, pendingPosition_);
+	return Macros::destinationForPosition(Macros::domainForOutput(clip->output), heldMacro_, pendingPosition_, clip);
 }
 
 int32_t MacroTargetAssignOverlay::firstFreeSlot() const {
@@ -129,9 +129,9 @@ void MacroTargetAssignOverlay::commitPendingDestination() {
 		display->displayPopup("MACRO SLOTS FULL");
 		return;
 	}
-	Macros::changeTargetDestination(clip, heldMacro_, slot, (uint8_t)destination);
+	Macros::changeTargetDestination(clip, heldMacro_, slot, (uint16_t)destination);
 	DEF_STACK_STRING_BUF(readout, 30);
-	Macros::appendDestinationName(readout, instrument, (uint8_t)destination);
+	Macros::appendDestinationName(readout, instrument, (uint16_t)destination);
 	readout.append(" added");
 	display->displayPopup(readout.c_str());
 }
@@ -162,13 +162,13 @@ void MacroTargetAssignOverlay::handleSelectEncoder(int32_t offset) {
 	}
 	Macros::Domain domain = Macros::domainForOutput(clip->output);
 	Macros::Macro& macro = instrument->macros[heldMacro_];
-	int32_t num = Macros::numDestinations(domain, heldMacro_);
+	int32_t num = Macros::numDestinations(domain, heldMacro_, clip);
 	int32_t step = (offset >= 0) ? 1 : -1;
 	int32_t position = pendingPosition_;
 	for (int32_t turns = std::abs(offset); turns > 0; turns--) {
 		int32_t next = position + step;
 		while (next >= 0 && next < num
-		       && macroTargets(macro, Macros::destinationForPosition(domain, heldMacro_, next))) {
+		       && macroTargets(macro, Macros::destinationForPosition(domain, heldMacro_, next, clip))) {
 			next += step;
 		}
 		if (next < -1 || next >= num) {
@@ -191,7 +191,7 @@ void MacroTargetAssignOverlay::handleSelectEncoder(int32_t offset) {
 	}
 	else {
 		stagingSlot_ = (int8_t)staging;
-		uint8_t destination = (uint8_t)Macros::destinationForPosition(domain, heldMacro_, pendingPosition_);
+		uint16_t destination = (uint16_t)Macros::destinationForPosition(domain, heldMacro_, pendingPosition_, clip);
 		Macros::showTargetRangeReadout(instrument, heldMacro_, staging, destination, false);
 		Macros::showTargetKnobIndicators(instrument, heldMacro_, staging);
 	}
@@ -222,8 +222,8 @@ void MacroTargetAssignOverlay::renderOverlay(RGB image[][kDisplayWidth + kSideBa
 	int32_t pending = pendingDestination(); // the encoder-dialed pick blinks its pad, if it has one
 	for (int32_t y = 0; y < kDisplayHeight; y++) {
 		for (int32_t x = 0; x < kDisplayWidth; x++) {
-			int32_t primary = Macros::macroDestinationForPad(domain, x, y, false);
-			int32_t second = Macros::macroDestinationForPad(domain, x, y, true);
+			int32_t primary = Macros::macroDestinationForPad(domain, x, y, false, clip);
+			int32_t second = Macros::macroDestinationForPad(domain, x, y, true, clip);
 			if (primary < 0 && second < 0) {
 				image[y][x] = colours::black; // not a valid destination
 				continue;
@@ -274,8 +274,8 @@ void MacroTargetAssignOverlay::handlePad(int32_t x, int32_t y, int32_t velocity)
 		return;
 	}
 	Macros::Domain domain = Macros::domainForOutput(clip->output);
-	int32_t primary = Macros::macroDestinationForPad(domain, x, y, false);
-	int32_t second = Macros::macroDestinationForPad(domain, x, y, true);
+	int32_t primary = Macros::macroDestinationForPad(domain, x, y, false, clip);
+	int32_t second = Macros::macroDestinationForPad(domain, x, y, true, clip);
 	if (primary < 0 && second < 0) {
 		return; // a dark pad - not a pickable destination
 	}
@@ -375,7 +375,7 @@ void MacroTargetAssignOverlay::addLayer(Clip* clip, int32_t x, int32_t y, int32_
 		display->displayPopup("MACRO SLOTS FULL");
 		return;
 	}
-	Macros::changeTargetDestination(clip, heldMacro_, freeSlot, (uint8_t)destination);
+	Macros::changeTargetDestination(clip, heldMacro_, freeSlot, (uint16_t)destination);
 	lastSlot_ = freeSlot;
 	secondLayer_ = addingSecond;
 	lastX_ = x;
@@ -395,7 +395,7 @@ void MacroTargetAssignOverlay::showReadout() {
 	if (instrument == nullptr) {
 		return;
 	}
-	uint8_t destination = instrument->macros[heldMacro_].targets[lastSlot_].destination;
+	uint16_t destination = instrument->macros[heldMacro_].targets[lastSlot_].destination;
 	Macros::showTargetRangeReadout(instrument, heldMacro_, lastSlot_, destination, false);
 	Macros::showTargetKnobIndicators(instrument, heldMacro_, lastSlot_);
 }
@@ -410,8 +410,8 @@ void MacroTargetAssignOverlay::deleteSelectedTarget() {
 		return;
 	}
 	Macros::Domain domain = Macros::domainForOutput(clip->output);
-	int32_t primary = Macros::macroDestinationForPad(domain, lastX_, lastY_, false);
-	int32_t second = Macros::macroDestinationForPad(domain, lastX_, lastY_, true);
+	int32_t primary = Macros::macroDestinationForPad(domain, lastX_, lastY_, false, clip);
+	int32_t second = Macros::macroDestinationForPad(domain, lastX_, lastY_, true, clip);
 	Macros::Macro& macro = instrument->macros[heldMacro_];
 	Macros::LayerAssignment la = Macros::layerAssignment(macro, primary, second);
 	bool primaryAssigned = la.primarySlot >= 0;
@@ -435,7 +435,7 @@ void MacroTargetAssignOverlay::deleteSelectedTarget() {
 		return; // this pad isn't assigned to the macro - nothing to delete
 	}
 	for (int32_t s = 0; s < Macros::kNumTargetSlots; s++) {
-		if (macro.targets[s].destination == (uint8_t)toDelete) {
+		if (macro.targets[s].destination == (uint16_t)toDelete) {
 			Macros::changeTargetDestination(clip, heldMacro_, s, Macros::kNoDestination);
 		}
 	}
@@ -467,7 +467,8 @@ void MacroTargetAssignOverlay::handleModEncoder(int32_t whichModEncoder, int32_t
 		return;
 	}
 	Macros::editTargetEndpoint(clip, instrument, heldMacro_, slot, whichModEncoder, offset);
-	uint8_t destination = (pending >= 0) ? (uint8_t)pending : instrument->macros[heldMacro_].targets[slot].destination;
+	uint16_t destination =
+	    (pending >= 0) ? (uint16_t)pending : instrument->macros[heldMacro_].targets[slot].destination;
 	Macros::showTargetRangeReadout(instrument, heldMacro_, slot, destination, false);
 	Macros::showTargetKnobIndicators(instrument, heldMacro_, slot);
 }
