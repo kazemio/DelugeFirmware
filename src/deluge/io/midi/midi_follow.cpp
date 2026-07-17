@@ -953,6 +953,28 @@ Output* MidiFollow::midiCCReceivedForSelectedOrActiveClip(MIDICable& cable, uint
 		// for these cc's, always use the active clip for the output selected
 		clip = getActiveClip(modelStack);
 		if (clip) {
+			// MIDI/CV arp CC interception: when enabled on this clip, CCs mapped to an arp param control the local
+			// arpeggiator instead of being passed through to the external instrument. The arp is the only internal
+			// param surface a MIDI/CV clip has, so all other CCs still pass through as normal.
+			if ((clip->output->type == OutputType::MIDI_OUT || clip->output->type == OutputType::CV)
+			    && (match == MIDIMatchType::CHANNEL || match == MIDIMatchType::MPE_MASTER)) {
+				ArpeggiatorSettings& arpSettings = ((InstrumentClip*)clip)->arpSettings;
+				if (arpSettings.midiInterceptArp) {
+					// Resolve the CC to an arp param. Most arp params are per-sound and live in ccToSoundParam, but
+					// arp rate is a "global" param: after a MIDIFollow.XML round-trip it is stored in ccToGlobalParam
+					// (as UNPATCHED_ARP_RATE) instead, so normalise it back to GLOBAL_ARP_RATE. Consulting both tables
+					// keeps interception working regardless of which surface the mapping was serialised to, and still
+					// honours any custom CC remaps in the user's MIDIFollow.XML.
+					int32_t arpParamId = ccToSoundParam[ccNumber];
+					if (arpParamId == PARAM_ID_NONE && ccToGlobalParam[ccNumber] == params::UNPATCHED_ARP_RATE) {
+						arpParamId = params::GLOBAL_ARP_RATE;
+					}
+					if (arpParamId != PARAM_ID_NONE && arpSettings.trySetArpParamFromMidiCC(arpParamId, ccValue)) {
+						// Consumed by the local arp - don't pass through to the external instrument.
+						return selected_track;
+					}
+				}
+			}
 			ModelStackWithTimelineCounter* modelStackWithTimelineCounter = modelStack->addTimelineCounter(clip);
 			if (modelStackWithTimelineCounter) {
 				if (clip->output->type == OutputType::KIT) {
