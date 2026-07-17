@@ -57,9 +57,17 @@ inline const char* outputTypeToString(OutputType type) {
 		return "CV";
 	case OutputType::AUDIO:
 		return "audio";
+	case OutputType::AUDIO_FX:
+		return "FX";
 	default:
 		return "none";
 	}
+}
+
+/// Whether outputs of this type are Instruments (and so may be cast to Instrument*).
+constexpr bool outputTypeIsInstrument(OutputType type) {
+	return type == OutputType::SYNTH || type == OutputType::KIT || type == OutputType::MIDI_OUT
+	       || type == OutputType::CV;
 }
 
 inline OutputType buttonToOutputType(deluge::hid::Button b) {

@@ -873,19 +873,22 @@ void renderSongFX(size_t numSamples) { // LPF and stutter for song (must happen 
 	// 167763968 is 134217728 made a bit bigger so that default filter resonance doesn't reduce volume overall
 
 	if (currentSong) {
-		currentSong->globalEffectable.processSaturation(renderingBuffer, &currentSong->paramManager);
-		currentSong->globalEffectable.setupFilterSetConfig(&masterVolumeAdjustmentL, &currentSong->paramManager);
+		// If an FXClip is active, its ParamManager drives the master FX chain in place of the Song's own
+		ParamManager* masterParamManager = currentSong->getActiveMasterParamManager();
+
+		currentSong->globalEffectable.processSaturation(renderingBuffer, masterParamManager);
+		currentSong->globalEffectable.setupFilterSetConfig(&masterVolumeAdjustmentL, masterParamManager);
 		currentSong->globalEffectable.processFilters(renderingBuffer);
 		currentSong->globalEffectable.processSRRAndBitcrushing(renderingBuffer, &masterVolumeAdjustmentL,
-		                                                       &currentSong->paramManager);
+		                                                       masterParamManager);
 
 		masterVolumeAdjustmentR = masterVolumeAdjustmentL; // This might have changed in the above function calls
 
-		currentSong->globalEffectable.processStutter(renderingBuffer, &currentSong->paramManager);
+		currentSong->globalEffectable.processStutter(renderingBuffer, masterParamManager);
 
 		// And we do panning for song here too - must be post reverb, and we had to do a volume adjustment below
 		// anyway
-		int32_t pan = currentSong->paramManager.getUnpatchedParamSet()->getValue(params::UNPATCHED_PAN) >> 1;
+		int32_t pan = masterParamManager->getUnpatchedParamSet()->getValue(params::UNPATCHED_PAN) >> 1;
 
 		if (pan != 0) {
 			// Set up panning
@@ -903,7 +906,7 @@ void renderSongFX(size_t numSamples) { // LPF and stutter for song (must happen 
 		int32_t songVolume =
 		    getFinalParameterValueVolume(
 		        134217728, cableToLinearParamShortcut(
-		                       currentSong->paramManager.getUnpatchedParamSet()->getValue(params::UNPATCHED_VOLUME)))
+		                       masterParamManager->getUnpatchedParamSet()->getValue(params::UNPATCHED_VOLUME)))
 		    >> 1;
 		// there used to be a static subtraction of 2 nepers (natural log based dB), this is the multiplicative
 		// equivalent
@@ -1285,8 +1288,8 @@ void updateReverbParams() {
 
 		// Set the initial "highest amount found" to that of the song itself, which can't be affected by sidechain.
 		// If nothing found with more reverb, then we don't want the reverb affected by sidechain
-		int32_t highestReverbAmountFound =
-		    currentSong->paramManager.getUnpatchedParamSet()->getValue(params::UNPATCHED_REVERB_SEND_AMOUNT);
+		int32_t highestReverbAmountFound = currentSong->getActiveMasterParamManager()->getUnpatchedParamSet()->getValue(
+		    params::UNPATCHED_REVERB_SEND_AMOUNT);
 
 		for (Output* thisOutput = currentSong->firstOutput; thisOutput; thisOutput = thisOutput->next) {
 			thisOutput->getThingWithMostReverb(&soundWithMostReverb, &paramManagerWithMostReverb,

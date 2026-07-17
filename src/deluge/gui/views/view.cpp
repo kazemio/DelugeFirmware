@@ -2182,7 +2182,7 @@ char const* View::getReverbPresetDisplayName(int32_t preset) {
 void View::displayOutputName(Output* output, bool doBlink, Clip* clip) {
 	int32_t channel{0}, channelSuffix{0};
 	bool editedByUser = true;
-	if (output->type != OutputType::AUDIO) {
+	if (outputTypeIsInstrument(output->type)) {
 		Instrument* instrument = (Instrument*)output;
 		editedByUser = !instrument->mightExistOnCard;
 		switch (output->type) {
@@ -2198,10 +2198,11 @@ void View::displayOutputName(Output* output, bool doBlink, Clip* clip) {
 		case OutputType::SYNTH:
 		case OutputType::KIT:
 		case OutputType::AUDIO:
+		case OutputType::AUDIO_FX:
 		case OutputType::NONE:;
 		}
 	}
-	else {
+	else if (output->type == OutputType::AUDIO) {
 		channel = static_cast<int32_t>(((AudioOutput*)output)->mode);
 	}
 
@@ -2249,7 +2250,7 @@ void View::drawOutputNameFromDetails(OutputType outputType, int32_t channel, int
 		bool isGridView =
 		    (getCurrentUI() == &sessionView && currentSong->sessionLayout == SessionLayoutType::SessionLayoutTypeGrid);
 
-		if (outputType != OutputType::AUDIO) {
+		if (outputTypeIsInstrument(outputType)) {
 			blinkLed(led);
 		}
 
