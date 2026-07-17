@@ -38,6 +38,7 @@
 #include "gui/views/arranger_view.h"
 #include "gui/views/audio_clip_view.h"
 #include "gui/views/automation_view.h"
+#include "gui/views/clip_type_splash.h"
 #include "gui/views/instrument_clip_view.h"
 #include "gui/views/performance_view.h"
 #include "gui/views/view.h"
@@ -2934,6 +2935,10 @@ void SessionView::transitionToSessionView() {
 		AudioClip* clip = getCurrentAudioClip(); // nullptr for FX clips - they take the no-sample path
 		if (!clip || !clip->sampleHolder.audioFile) {
 			memcpy(PadLEDs::imageStore, PadLEDs::image, sizeof(PadLEDs::image));
+			// Fade in from black rather than fading the clip-type splash out, which reads as lag
+			if (clipTypeSplashOnLivePads()) {
+				clipTypeSplashBlankStoreRows(PadLEDs::imageStore, kDisplayHeight);
+			}
 			finishedTransitioningHere();
 		}
 		else {
@@ -2988,6 +2993,11 @@ void SessionView::transitionToSessionView() {
 				instrumentClipView.renderMainPads(0xFFFFFFFF, &PadLEDs::imageStore[1], &PadLEDs::occupancyMaskStore[1],
 				                                  false);
 				instrumentClipView.renderSidebar(0xFFFFFFFF, &PadLEDs::imageStore[1], &PadLEDs::occupancyMaskStore[1]);
+
+				// Collapse an empty clip from black rather than animating the splash word out
+				if (clipTypeSplashOnLivePads()) {
+					clipTypeSplashBlankStoreRows(&PadLEDs::imageStore[1], kDisplayHeight);
+				}
 
 				// I didn't see a difference but the + 2 seems intentional
 				PadLEDs::numAnimatedRows = kDisplayHeight + 2;
@@ -4615,6 +4625,10 @@ void SessionView::gridTransitionToSessionView() {
 		if (!audioClip || !audioClip->sampleHolder.audioFile) {
 			changeRootUI(&sessionView);
 			memcpy(PadLEDs::imageStore, PadLEDs::image, sizeof(PadLEDs::image));
+			// Fade in from black rather than fading the clip-type splash out, which reads as lag
+			if (clipTypeSplashOnLivePads()) {
+				clipTypeSplashBlankStoreRows(PadLEDs::imageStore, kDisplayHeight);
+			}
 			finishedTransitioningHere();
 			return;
 		}
@@ -4624,6 +4638,11 @@ void SessionView::gridTransitionToSessionView() {
 
 	memcpy(PadLEDs::imageStore[1], PadLEDs::image, (kDisplayWidth + kSideBarWidth) * kDisplayHeight * sizeof(RGB));
 	memcpy(PadLEDs::occupancyMaskStore[1], PadLEDs::occupancyMask, (kDisplayWidth + kSideBarWidth) * kDisplayHeight);
+	// Collapse an empty clip from black rather than animating the splash word out (only the note
+	// view draws the splash; keyboard/automation screens must keep their copied image untouched)
+	if (getCurrentUI() == &instrumentClipView && clipTypeSplashOnLivePads()) {
+		clipTypeSplashBlankStoreRows(&PadLEDs::imageStore[1], kDisplayHeight);
+	}
 	// Grid collapse uses the same offscreen instrument rows whether the current editor is notes or automation.
 	if (getCurrentClip()->type == ClipType::INSTRUMENT
 	    && (getCurrentUI() == &instrumentClipView || getCurrentUI() == &automationView)) {

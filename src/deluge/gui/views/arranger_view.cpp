@@ -31,6 +31,7 @@
 #include "gui/ui_timer_manager.h"
 #include "gui/views/audio_clip_view.h"
 #include "gui/views/automation_view.h"
+#include "gui/views/clip_type_splash.h"
 #include "gui/views/instrument_clip_view.h"
 #include "gui/views/session_view.h"
 #include "gui/views/view.h"
@@ -1977,6 +1978,10 @@ bool ArrangerView::transitionToArrangementEditor() {
 
 	memcpy(PadLEDs::imageStore[1], PadLEDs::image, (kDisplayWidth + kSideBarWidth) * kDisplayHeight * sizeof(RGB));
 	memcpy(PadLEDs::occupancyMaskStore[1], PadLEDs::occupancyMask, (kDisplayWidth + kSideBarWidth) * kDisplayHeight);
+	// Collapse an empty clip from black rather than animating the clip-type splash word out
+	if ((getCurrentUI() == &instrumentClipView || getCurrentUI() == &audioClipView) && clipTypeSplashOnLivePads()) {
+		clipTypeSplashBlankStoreRows(&PadLEDs::imageStore[1], kDisplayHeight);
+	}
 	// Both instrument and automation views need the offscreen instrument rows for a complete collapse into Arranger.
 	if (getCurrentClip()->type == ClipType::INSTRUMENT
 	    && (getCurrentUI() == &instrumentClipView || getCurrentUI() == &automationView)) {

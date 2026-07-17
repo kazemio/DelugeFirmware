@@ -26,6 +26,7 @@
 #include "gui/ui_timer_manager.h"
 #include "gui/views/arranger_view.h"
 #include "gui/views/automation_view.h"
+#include "gui/views/clip_type_splash.h"
 #include "gui/views/macro_target_assign_overlay.h"
 #include "gui/views/session_view.h"
 #include "gui/views/view.h"
@@ -119,11 +120,29 @@ bool AudioClipView::renderMainPads(uint32_t whichRows, RGB image[][kDisplayWidth
 		return true;
 	}
 
-	// If no Sample, just clear display
+	// If no Sample, spell the clip type across the pads while the clip is empty
+	// (AUDIO with no sample loaded; FX until any automation exists). While recording is underway
+	// the grid just clears so the incoming waveform draws onto a clean background.
 	if (!getSample()) {
-		for (int32_t y = 0; y < kDisplayHeight; y++) {
-			memset(image[y], 0, kDisplayWidth * 3);
+		Clip* clip = getCurrentClip();
+		char const* word = nullptr;
+		RGB colour = colours::black;
+		if (clip) {
+			if (clip->type == ClipType::FX) {
+				if (clip->isEmpty(false)) {
+					word = "FX";
+					colour = colours::orange.dim();
+				}
+			}
+			else if (!clip->getCurrentlyRecordingLinearly()) {
+				word = "AUDIO";
+				colour = colours::green.dim();
+			}
 		}
+		if (clipTypeSplashStateChanged(word != nullptr)) {
+			whichRows = 0xFFFFFFFF;
+		}
+		renderClipTypeSplash(word, colour, whichRows, image, occupancyMask);
 		return true;
 	}
 
@@ -137,6 +156,14 @@ bool AudioClipView::renderMainPads(uint32_t whichRows, RGB image[][kDisplayWidth
 	}
 
 	AudioClip& clip = *clipPtr;
+
+	// If the splash (or its blank state) was on the pads last render, the cached waveform render
+	// data no longer matches what's displayed - repaint everything from scratch.
+	if (clipTypeSplashStateChanged(false)) {
+		whichRows = 0xFFFFFFFF;
+		clip.renderData.xScroll = -1;
+	}
+
 	SampleRecorder* recorder = clip.recorder;
 
 	// end marker column

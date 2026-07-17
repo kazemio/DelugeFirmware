@@ -38,6 +38,7 @@
 #include "gui/ui/ui.h"
 #include "gui/ui_timer_manager.h"
 #include "gui/views/automation_view.h"
+#include "gui/views/clip_type_splash.h"
 #include "gui/views/macro_target_assign_overlay.h"
 #include "gui/views/timeline_view.h"
 #include "gui/views/view.h"
@@ -7351,6 +7352,41 @@ bool InstrumentClipView::renderMainPads(uint32_t whichRows, RGB image[][kDisplay
 	if (macroTargetAssignOverlay.active()) {
 		PadLEDs::renderingLock = true;
 		macroTargetAssignOverlay.renderOverlay(image, occupancyMask);
+		PadLEDs::renderingLock = false;
+		return true;
+	}
+
+	// A totally empty clip spells its type across the pads until the first note lands
+	char const* splashWord = nullptr;
+	RGB splashColour = colours::black;
+	if (!getCurrentInstrumentClip()->containsAnyNotes()) {
+		switch (getCurrentOutputType()) {
+		case OutputType::SYNTH:
+			splashWord = "SYNTH";
+			splashColour = colours::darkblue.dim();
+			break;
+		case OutputType::KIT:
+			splashWord = "KIT";
+			splashColour = colours::yellow.dim();
+			break;
+		case OutputType::MIDI_OUT:
+			splashWord = "MIDI";
+			splashColour = colours::red.dim();
+			break;
+		case OutputType::CV:
+			splashWord = "CV";
+			splashColour = colours::purple.dim();
+			break;
+		default:
+			break;
+		}
+	}
+	if (clipTypeSplashStateChanged(splashWord != nullptr)) {
+		whichRows = 0xFFFFFFFF;
+	}
+	if (splashWord) {
+		PadLEDs::renderingLock = true;
+		renderClipTypeSplash(splashWord, splashColour, whichRows, image, occupancyMask);
 		PadLEDs::renderingLock = false;
 		return true;
 	}
