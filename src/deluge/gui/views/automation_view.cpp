@@ -487,7 +487,7 @@ void AutomationView::focusRegained() {
 		ClipView::focusRegained();
 
 		Clip* clip = getCurrentClip();
-		if (clip->type == ClipType::AUDIO) {
+		if (clip->type != ClipType::INSTRUMENT) {
 			indicator_leds::setLedState(IndicatorLED::BACK, false);
 			indicator_leds::setLedState(IndicatorLED::AFFECT_ENTIRE, true);
 			view.focusRegained();
@@ -584,7 +584,7 @@ void AutomationView::graphicsRoutine() {
 		arrangerView.graphicsRoutine();
 	}
 	else {
-		if (getCurrentClip()->type == ClipType::AUDIO) {
+		if (getCurrentClip()->type != ClipType::INSTRUMENT) {
 			audioClipView.graphicsRoutine();
 		}
 		else {
@@ -607,7 +607,7 @@ UIType AutomationView::getUIContextType() {
 		return UIType::ARRANGER;
 	}
 	else {
-		if (getCurrentClip()->type == ClipType::AUDIO) {
+		if (getCurrentClip()->type != ClipType::INSTRUMENT) {
 			return UIType::AUDIO_CLIP;
 		}
 		else {
@@ -819,7 +819,8 @@ void AutomationView::renderAutomationOverview(ModelStackWithTimelineCounter* mod
 				}
 			}
 
-			else if ((onArrangerView || (outputType == OutputType::AUDIO) || affectEntireKit)) {
+			else if ((onArrangerView || (outputType == OutputType::AUDIO) || (outputType == OutputType::AUDIO_FX)
+			          || affectEntireKit)) {
 				int32_t paramID = unpatchedGlobalParamShortcuts[xDisplay][yDisplay];
 				if (paramID != kNoParamID) {
 					if (onArrangerView) {
@@ -837,7 +838,15 @@ void AutomationView::renderAutomationOverview(ModelStackWithTimelineCounter* mod
 						    currentSong->getModelStackWithParam(modelStackWithThreeMainThings, paramID);
 					}
 					else {
-						if (outputType == OutputType::AUDIO
+						// FX clips drive the song master chain, which like arranger has no pitch adjust or sidechain
+						if (outputType == OutputType::AUDIO_FX
+						    && ((paramID == params::UNPATCHED_PITCH_ADJUST)
+						        || (paramID == params::UNPATCHED_SIDECHAIN_SHAPE)
+						        || (paramID == params::UNPATCHED_SIDECHAIN_VOLUME))) {
+							pixel = colours::black; // erase pad
+							continue;
+						}
+						if ((outputType == OutputType::AUDIO || outputType == OutputType::AUDIO_FX)
 						    && ((paramID >= params::UNPATCHED_FIRST_ARP_PARAM
 						         && paramID <= params::UNPATCHED_LAST_ARP_PARAM)
 						        || paramID == params::UNPATCHED_ARP_RATE)) {
@@ -1141,11 +1150,13 @@ ActionResult AutomationView::buttonAction(hid::Button b, bool on, bool inCardRou
 	using namespace hid::button;
 
 	Clip* clip = getCurrentClip();
-	bool isAudioClip = clip->type == ClipType::AUDIO;
+	// FX clips get the same (restricted) button treatment as audio clips
+	bool isAudioClip = clip->type != ClipType::INSTRUMENT;
 
 	// these button actions are not used in the audio clip automation view
+	// (KEYBOARD included: keyboard screen requires an instrument clip)
 	if (isAudioClip) {
-		if (b == SCALE_MODE || b == KIT || b == SYNTH || b == MIDI || b == CV) {
+		if (b == SCALE_MODE || b == KIT || b == SYNTH || b == MIDI || b == CV || b == KEYBOARD) {
 			return ActionResult::DEALT_WITH;
 		}
 	}
@@ -1347,6 +1358,8 @@ void AutomationView::handleClipButtonAction(bool on, bool isAudioClip) {
 		if (onArrangerView) {
 			changeRootUI(&arrangerView);
 		}
+		// an FX clip's only view is the automation view, so there's nothing to go back to
+		else if (getCurrentClip()->type == ClipType::FX) {}
 		// automation audio clip view transitioning back to audio clip view
 		else if (isAudioClip) {
 			changeRootUI(&audioClipView);
@@ -1499,7 +1512,8 @@ bool AutomationView::handleHorizontalEncoderButtonAction(bool on, bool isAudioCl
 	}
 	else if (isAudioClip) {
 		// removing time stretching by re-calculating clip length based on length of audio sample
-		if (on && Buttons::isButtonPressed(deluge::hid::button::Y_ENC) && currentUIMode == UI_MODE_NONE) {
+		if (on && Buttons::isButtonPressed(deluge::hid::button::Y_ENC) && currentUIMode == UI_MODE_NONE
+		    && getCurrentClip()->type == ClipType::AUDIO) {
 			audioClipView.setClipLengthEqualToSampleLength();
 			return false;
 		}
@@ -1543,7 +1557,7 @@ bool AutomationView::handleHorizontalEncoderButtonAction(bool on, bool isAudioCl
 bool AutomationView::handleBackAndHorizontalEncoderButtonComboAction(Clip* clip, bool on) {
 	// only allow clearing of a clip if you're on the automation overview
 	if (on && onAutomationOverview()) {
-		if (clip->type == ClipType::AUDIO || onArrangerView) {
+		if (clip->type != ClipType::INSTRUMENT || onArrangerView) {
 			// clear all arranger automation
 			if (onArrangerView) {
 				Action* action = actionLogger.getNewAction(ActionType::ARRANGEMENT_CLEAR, ActionAddition::NOT_ALLOWED);
@@ -1678,7 +1692,7 @@ ActionResult AutomationView::padAction(int32_t x, int32_t y, int32_t velocity) {
 
 	Clip* clip = getCurrentClip();
 
-	if (clip->type == ClipType::AUDIO) {
+	if (clip->type != ClipType::INSTRUMENT) {
 		if (x >= kDisplayWidth) {
 			return ActionResult::DEALT_WITH;
 		}
@@ -1928,8 +1942,8 @@ void AutomationView::handleParameterSelection(Clip* clip, Output* output, Output
 		}
 	}
 
-	// if you are in arranger, an audio clip, or a kit clip with affect entire enabled
-	else if ((onArrangerView || (outputType == OutputType::AUDIO)
+	// if you are in arranger, an audio clip, an FX clip, or a kit clip with affect entire enabled
+	else if ((onArrangerView || (outputType == OutputType::AUDIO) || (outputType == OutputType::AUDIO_FX)
 	          || (outputType == OutputType::KIT && getAffectEntire()))
 	         && (unpatchedGlobalParamShortcuts[xDisplay][yDisplay] != kNoParamID)) {
 
@@ -1937,7 +1951,8 @@ void AutomationView::handleParameterSelection(Clip* clip, Output* output, Output
 		int32_t paramID = unpatchedGlobalParamShortcuts[xDisplay][yDisplay];
 
 		// don't allow automation of pitch adjust, or sidechain in arranger
-		if (onArrangerView
+		// (FX clips target the same song master chain, so they get the same exclusions)
+		if ((onArrangerView || outputType == OutputType::AUDIO_FX)
 		    && ((paramID == params::UNPATCHED_PITCH_ADJUST) || (paramID == params::UNPATCHED_SIDECHAIN_SHAPE)
 		        || (paramID == params::UNPATCHED_SIDECHAIN_VOLUME)
 		        || (paramID >= params::UNPATCHED_FIRST_ARP_PARAM && paramID <= params::UNPATCHED_LAST_ARP_PARAM)
@@ -2346,7 +2361,7 @@ ActionResult AutomationView::verticalEncoderAction(int32_t offset, bool inCardRo
 		return ActionResult::DEALT_WITH;
 	}
 
-	if (getCurrentClip()->type == ClipType::AUDIO) {
+	if (getCurrentClip()->type != ClipType::INSTRUMENT) {
 		return ActionResult::DEALT_WITH;
 	}
 
@@ -2626,8 +2641,8 @@ void AutomationView::selectEncoderAction(int8_t offset) {
 	}
 	// if you're in arranger view or in a non-midi, non-cv clip (e.g. audio, synth, kit)
 	else if (onArrangerView || outputType != OutputType::CV) {
-		// if you're in a audio clip, a kit with affect entire enabled, or in arranger view
-		if (onArrangerView || (outputType == OutputType::AUDIO)
+		// if you're in a audio clip, an FX clip, a kit with affect entire enabled, or in arranger view
+		if (onArrangerView || (outputType == OutputType::AUDIO) || (outputType == OutputType::AUDIO_FX)
 		    || (outputType == OutputType::KIT && getAffectEntire())) {
 			selectGlobalParam(offset, clip);
 		}
@@ -2717,6 +2732,32 @@ void AutomationView::selectGlobalParam(int32_t offset, Clip* clip) {
 		{
 			while ((id >= params::UNPATCHED_FIRST_ARP_PARAM && id <= params::UNPATCHED_LAST_ARP_PARAM)
 			       || id == params::UNPATCHED_ARP_RATE) {
+
+				if (offset < 0) {
+					offset -= 1;
+				}
+				else if (offset > 0) {
+					offset += 1;
+				}
+				idx = getNextSelectedParamArrayPosition(offset, clip->lastSelectedParamArrayPosition,
+				                                        kNumGlobalParamsForAutomation);
+				id = globalParamsForAutomation[idx].second;
+			}
+		}
+		clip->lastSelectedParamID = id;
+		clip->lastSelectedParamKind = kind;
+		clip->lastSelectedParamArrayPosition = idx;
+	}
+	else if (clip->output->type == OutputType::AUDIO_FX) {
+		// FX clips drive the song master chain, so they get the arranger exclusion set
+		auto idx = getNextSelectedParamArrayPosition(offset, clip->lastSelectedParamArrayPosition,
+		                                             kNumGlobalParamsForAutomation);
+		auto [kind, id] = globalParamsForAutomation[idx];
+		{
+			while ((id == params::UNPATCHED_PITCH_ADJUST || id == params::UNPATCHED_SIDECHAIN_SHAPE
+			        || id == params::UNPATCHED_SIDECHAIN_VOLUME || id == params::UNPATCHED_COMPRESSOR_THRESHOLD
+			        || (id >= params::UNPATCHED_FIRST_ARP_PARAM && id <= params::UNPATCHED_LAST_ARP_PARAM)
+			        || id == params::UNPATCHED_ARP_RATE)) {
 
 				if (offset < 0) {
 					offset -= 1;
@@ -2968,10 +3009,10 @@ void AutomationView::getLastSelectedParamArrayPosition(Clip* clip) {
 	Output* output = clip->output;
 	OutputType outputType = output->type;
 
-	// if you're in arranger view or in a non-midi, non-cv clip (e.g. audio, synth, kit)
+	// if you're in arranger view or in a non-midi, non-cv clip (e.g. audio, FX, synth, kit)
 	if (onArrangerView || outputType != OutputType::CV) {
-		// if you're in a audio clip, a kit with affect entire enabled, or in arranger view
-		if (onArrangerView || (outputType == OutputType::AUDIO)
+		// if you're in a audio clip, an FX clip, a kit with affect entire enabled, or in arranger view
+		if (onArrangerView || (outputType == OutputType::AUDIO) || (outputType == OutputType::AUDIO_FX)
 		    || (outputType == OutputType::KIT && getAffectEntire())) {
 			getLastSelectedGlobalParamArrayPosition(clip);
 		}
@@ -3023,7 +3064,7 @@ void AutomationView::noteRowChanged(InstrumentClip* clip, NoteRow* noteRow) {
 
 // called by playback_handler.cpp
 void AutomationView::notifyPlaybackBegun() {
-	if (!onArrangerView && getCurrentClip()->type != ClipType::AUDIO) {
+	if (!onArrangerView && getCurrentClip()->type == ClipType::INSTRUMENT) {
 		instrumentClipView.reassessAllAuditionStatus();
 	}
 }

@@ -90,6 +90,7 @@ tryDefaultDir:
 		// explicit fallthrough cases
 		case OutputType::CV:
 		case OutputType::AUDIO:
+		case OutputType::AUDIO_FX:
 		case OutputType::NONE:;
 		}
 	}
@@ -218,6 +219,7 @@ fail:
 		endString = "\n</midi>\n";
 	// explicit fallthrough cases
 	case OutputType::AUDIO:
+	case OutputType::AUDIO_FX:
 	case OutputType::CV:
 	case OutputType::NONE:;
 	}

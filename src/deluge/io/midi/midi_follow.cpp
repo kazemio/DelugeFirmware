@@ -540,6 +540,7 @@ MidiFollow::getModelStackWithParamForClip(ModelStackWithTimelineCounter* modelSt
 		    getModelStackWithParamForKitClip(modelStackWithTimelineCounter, clip, soundParamId, globalParamId);
 		break;
 	case OutputType::AUDIO:
+	case OutputType::AUDIO_FX:
 		modelStackWithParam =
 		    getModelStackWithParamForAudioClip(modelStackWithTimelineCounter, clip, soundParamId, globalParamId);
 		break;

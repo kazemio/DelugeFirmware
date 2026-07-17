@@ -49,6 +49,7 @@
 #include "model/action/action_logger.h"
 #include "model/clip/audio_clip.h"
 #include "model/clip/clip_instance.h"
+#include "model/clip/fx_clip.h"
 #include "model/clip/instrument_clip.h"
 #include "model/clip/instrument_clip_minder.h"
 #include "model/consequence/consequence_arranger_params_time_inserted.h"
@@ -348,8 +349,8 @@ doChangeOutputType:
 
 			Output* output = outputsOnScreen[yPressedEffective];
 
-			// Don't allow converting audio output to instrument
-			if (output->type == OutputType::AUDIO) {
+			// Don't allow converting audio / FX outputs to instrument
+			if (!outputTypeIsInstrument(output->type)) {
 				display->displayPopup(l10n::get(l10n::String::STRING_FOR_CANT_CONVERT_TYPE));
 			}
 
@@ -661,7 +662,7 @@ void ArrangerView::drawAuditionSquare(int32_t yDisplay, RGB thisImage[]) {
 	if (view.midiLearnFlashOn) {
 		Output* output = outputsOnScreen[yDisplay];
 
-		if (!output || output->type == OutputType::AUDIO) {
+		if (!output || !outputTypeIsInstrument(output->type)) {
 			goto drawNormally;
 		}
 
@@ -735,7 +736,7 @@ Drum* ArrangerView::getDrumForAudition(Kit* kit) {
 
 void ArrangerView::beginAudition(Output* output) {
 
-	if (output->type == OutputType::AUDIO) {
+	if (!outputTypeIsInstrument(output->type)) {
 		return;
 	}
 
@@ -779,7 +780,7 @@ void ArrangerView::beginAudition(Output* output) {
 
 void ArrangerView::endAudition(Output* output, bool evenIfPlaying) {
 
-	if (output->type == OutputType::AUDIO) {
+	if (!outputTypeIsInstrument(output->type)) {
 		return;
 	}
 
@@ -1161,7 +1162,7 @@ ActionResult ArrangerView::handleAuditionPadAction(int32_t y, int32_t velocity, 
 					openUI(&context_menu::audioInputSelector);
 				}
 			}
-			else {
+			else if (outputTypeIsInstrument(output->type)) {
 				view.instrumentMidiLearnPadPressed(velocity, (MelodicInstrument*)output);
 			}
 		}
@@ -1655,7 +1656,16 @@ void ArrangerView::createNewClipForClipInstance(Output* output, ClipInstance* cl
 		return exitSubModeWithoutAction();
 	}
 
-	int32_t size = (output->type == OutputType::AUDIO) ? sizeof(AudioClip) : sizeof(InstrumentClip);
+	int32_t size;
+	if (output->type == OutputType::AUDIO) {
+		size = sizeof(AudioClip);
+	}
+	else if (output->type == OutputType::AUDIO_FX) {
+		size = sizeof(FXClip);
+	}
+	else {
+		size = sizeof(InstrumentClip);
+	}
 
 	void* memory = GeneralMemoryAllocator::get().allocMaxSpeed(size);
 	if (!memory) {
@@ -1667,6 +1677,8 @@ void ArrangerView::createNewClipForClipInstance(Output* output, ClipInstance* cl
 
 	if (output->type == OutputType::AUDIO)
 		newClip = new (memory) AudioClip();
+	else if (output->type == OutputType::AUDIO_FX)
+		newClip = new (memory) FXClip();
 	else
 		newClip = new (memory) InstrumentClip(currentSong);
 
@@ -1683,6 +1695,9 @@ void ArrangerView::createNewClipForClipInstance(Output* output, ClipInstance* cl
 	if (output->type == OutputType::AUDIO) {
 		error = ((AudioClip*)newClip)->setOutput(modelStack, output);
 	}
+	else if (output->type == OutputType::AUDIO_FX) {
+		error = ((FXClip*)newClip)->setOutput(modelStack, output);
+	}
 	else {
 		error = ((InstrumentClip*)newClip)->setInstrument((Instrument*)output, currentSong, nullptr);
 	}
@@ -1694,7 +1709,7 @@ void ArrangerView::createNewClipForClipInstance(Output* output, ClipInstance* cl
 		return exitSubModeWithoutAction();
 	}
 
-	if (output->type != OutputType::AUDIO) {
+	if (outputTypeIsInstrument(output->type)) {
 		((Instrument*)output)->setupPatching(modelStack);
 		((InstrumentClip*)newClip)->setupAsNewKitClipIfNecessary(modelStack);
 	}
@@ -2589,6 +2604,9 @@ void ArrangerView::navigateThroughPresets(int32_t offset) {
 		ao->scrollAudioOutputMode(offset);
 		return;
 	}
+	if (output->type == OutputType::AUDIO_FX) {
+		return; // nothing to navigate through for the FX track
+	}
 
 	endAudition(output);
 
@@ -2637,7 +2655,7 @@ void ArrangerView::changeOutputType(OutputType newOutputType) {
 void ArrangerView::changeOutputToAudio() {
 
 	Output* oldOutput = outputsOnScreen[yPressedEffective];
-	if (oldOutput->type == OutputType::AUDIO) {
+	if (!outputTypeIsInstrument(oldOutput->type)) {
 		return;
 	}
 

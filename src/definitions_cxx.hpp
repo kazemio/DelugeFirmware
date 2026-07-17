@@ -235,6 +235,7 @@ enum class OutputType : uint8_t {
 	MIDI_OUT,
 	CV,
 	AUDIO,
+	AUDIO_FX,
 	NONE = 255,
 };
 
@@ -1106,6 +1107,7 @@ enum GridMode : uint8_t {
 enum class ClipType {
 	INSTRUMENT,
 	AUDIO,
+	FX,
 };
 
 enum class LaunchStyle { DEFAULT, FILL, ONCE };

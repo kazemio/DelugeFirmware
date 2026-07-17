@@ -1764,6 +1764,11 @@ doMIDIOrCV:
 				}
 			}
 
+			else if (clip->type == ClipType::FX) {
+				// FX clips edit the song master FX chain, so they get the song FX menu
+				newItem = &soundEditorRootMenuSongView;
+			}
+
 			else {
 				newItem = &soundEditorRootMenuAudioClip;
 			}

@@ -57,6 +57,7 @@
 #include "model/clip/audio_clip.h"
 #include "model/clip/clip.h"
 #include "model/clip/clip_instance.h"
+#include "model/clip/fx_clip.h"
 #include "model/clip/instrument_clip.h"
 #include "model/clip/instrument_clip_minder.h"
 #include "model/instrument/instrument.h"
@@ -71,6 +72,7 @@
 #include "playback/playback_handler.h"
 #include "processing/audio_output.h"
 #include "processing/engines/audio_engine.h"
+#include "processing/fx_output.h"
 #include "processing/stem_export/stem_export.h"
 #include "scheduler_api.h"
 #include "storage/audio/audio_file_manager.h"
@@ -587,8 +589,8 @@ changeOutputType:
 			Clip* clip = getClipForLayout();
 
 			if (clip != nullptr) {
-				// Don't allow converting audio clip to instrument clip
-				if (clip->type == ClipType::AUDIO) {
+				// Don't allow converting audio / FX clips to instrument clips
+				if (clip->type != ClipType::INSTRUMENT) {
 					display->displayPopup(l10n::get(l10n::String::STRING_FOR_CANT_CONVERT_TYPE));
 				}
 				else {
@@ -930,7 +932,7 @@ startHoldingDown:
 					}
 
 					// InstrumentClip
-					else {
+					else if (clip->type == ClipType::INSTRUMENT) {
 midiLearnMelodicInstrumentAction:
 
 						if (sdRoutineLock) {
@@ -1346,7 +1348,7 @@ void SessionView::commandChangeClipPreset(int8_t offset) {
 		case SessionLayoutType::SessionLayoutTypeMaxElement:;
 		}
 	}
-	else {
+	else if (clip->type == ClipType::AUDIO) {
 		auto ao = (AudioOutput*)clip->output;
 		ao->scrollAudioOutputMode(offset);
 	}
@@ -1684,6 +1686,14 @@ Clip* SessionView::createNewClip(OutputType outputType, int32_t yDisplay) {
 			clip = createNewAudioClip(yDisplay);
 		}
 		break;
+	case OutputType::AUDIO_FX:
+		if (currentSong->sessionLayout == SessionLayoutType::SessionLayoutTypeGrid) {
+			clip = gridCreateFXClipWithNewTrack();
+		}
+		else {
+			clip = createNewFXClip(yDisplay);
+		}
+		break;
 	default:
 		if (currentSong->sessionLayout == SessionLayoutType::SessionLayoutTypeGrid) {
 			clip = gridCreateInstrumentClipWithNewTrack(outputType);
@@ -1724,6 +1734,41 @@ Clip* SessionView::createNewAudioClip(int32_t yDisplay) {
 	// Insert and Resync New Clip
 	if (!insertAndResyncNewClip(newClip, yDisplay)) {
 		newClip->~AudioClip();
+		delugeDealloc(clipMemory);
+		display->displayError(Error::INSUFFICIENT_RAM);
+		return nullptr;
+	}
+
+	return newClip;
+}
+
+Clip* SessionView::createNewFXClip(int32_t yDisplay) {
+	actionLogger.deleteAllLogs();
+
+	// Allocate memory for FX clip
+	void* clipMemory = GeneralMemoryAllocator::get().allocMaxSpeed(sizeof(FXClip));
+	if (clipMemory == nullptr) {
+		display->displayError(Error::INSUFFICIENT_RAM);
+		return nullptr;
+	}
+
+	// Create the FX clip and ParamManager
+	FXClip* newClip = new (clipMemory) FXClip();
+
+	// suss output - reuses the song's single FX track if it already exists
+	if (!createNewTrackForFXClip(newClip)) {
+		newClip->~FXClip();
+		delugeDealloc(clipMemory);
+		display->displayError(Error::INSUFFICIENT_RAM);
+		return nullptr;
+	}
+
+	// Give the new clip its stuff
+	setupNewClip(newClip);
+
+	// Insert and Resync New Clip
+	if (!insertAndResyncNewClip(newClip, yDisplay)) {
+		newClip->~FXClip();
 		delugeDealloc(clipMemory);
 		display->displayError(Error::INSUFFICIENT_RAM);
 		return nullptr;
@@ -2688,7 +2733,8 @@ bool SessionView::renderRow(ModelStack* modelStack, uint8_t yDisplay, RGB thisIm
 	if (clip) {
 
 		// If user assigning MIDI controls and this Clip has a command assigned, flash pink
-		if (view.midiLearnFlashOn && ((Instrument*)clip->output)->midiInput.containsSomething()) {
+		if (view.midiLearnFlashOn && outputTypeIsInstrument(clip->output->type)
+		    && ((Instrument*)clip->output)->midiInput.containsSomething()) {
 
 			for (int32_t xDisplay = 0; xDisplay < kDisplayWidth; xDisplay++) {
 				// We halve the intensity of the brightness in this case, because a lot of pads will be lit, it
@@ -3076,7 +3122,7 @@ void SessionView::midiLearnFlash() {
 				sideRowsToRender |= (1 << yDisplay);
 			}
 
-			if (clip->output->type != OutputType::AUDIO && clip->output->type != OutputType::NONE) {
+			if (outputTypeIsInstrument(clip->output->type)) {
 
 				if (((Instrument*)clip->output)->midiInput.containsSomething()
 				    || (view.thingPressedForMidiLearn == MidiLearn::INSTRUMENT_INPUT
@@ -3389,7 +3435,7 @@ RGB SessionView::gridRenderClipColor(Clip* clip, int32_t x, int32_t y, bool rend
 		else {
 			// Instrument learned
 			OutputType type = clip->output->type;
-			bool canLearn = (type != OutputType::AUDIO && type != OutputType::NONE);
+			bool canLearn = outputTypeIsInstrument(type);
 			if (canLearn && ((MelodicInstrument*)clip->output)->midiInput.containsSomething()) {
 				return colours::midi_command;
 			}
@@ -3524,6 +3570,20 @@ bool SessionView::createNewTrackForAudioClip(AudioClip* newClip) {
 	return true;
 }
 
+bool SessionView::createNewTrackForFXClip(FXClip* newClip) {
+	// Suss output - the song's single FX track, created on demand
+	FXOutput* newOutput = currentSong->createNewFXOutput();
+	if (!newOutput) {
+		return false;
+	}
+
+	char modelStackMemory[MODEL_STACK_MAX_SIZE];
+	ModelStack* modelStack = setupModelStackWithSong(modelStackMemory, currentSong);
+	newClip->setOutput(modelStack->addTimelineCounter(newClip), newOutput);
+
+	return true;
+}
+
 bool SessionView::createNewTrackForInstrumentClip(OutputType type, InstrumentClip* clip, bool copyDrumsFromClip) {
 	bool instrumentAlreadyInSong = false;
 	if (type == OutputType::SYNTH || type == OutputType::KIT) {
@@ -3579,6 +3639,29 @@ AudioClip* SessionView::gridCreateAudioClipWithNewTrack() {
 	AudioClip* newClip = new (memory) AudioClip();
 	if (!createNewTrackForAudioClip(newClip)) {
 		newClip->~AudioClip();
+		delugeDealloc(memory);
+		display->displayError(Error::INSUFFICIENT_RAM);
+		return nullptr;
+	}
+
+	// For safety we set it up exactly as we want it
+	setupNewClip(newClip);
+
+	return newClip;
+}
+
+FXClip* SessionView::gridCreateFXClipWithNewTrack() {
+	// Allocate new clip
+	void* memory = GeneralMemoryAllocator::get().allocMaxSpeed(sizeof(FXClip));
+	if (!memory) {
+		display->displayError(Error::INSUFFICIENT_RAM);
+		return nullptr;
+	}
+
+	// If the song already has its FX track, the new clip simply joins it (only one FX track per song)
+	FXClip* newClip = new (memory) FXClip();
+	if (!createNewTrackForFXClip(newClip)) {
+		newClip->~FXClip();
 		delugeDealloc(memory);
 		display->displayError(Error::INSUFFICIENT_RAM);
 		return nullptr;
@@ -3697,14 +3780,20 @@ Clip* SessionView::gridCreateClip(uint32_t targetSection, Output* targetOutput, 
 
 	// From source
 	if (sourceClip != nullptr) {
-		// Can't convert between audio and non audio tracks
+		// Can't convert between track families (instrument / audio / FX)
 		if (targetOutput) {
-			bool sourceIsAudio = (sourceClip->output->type == OutputType::AUDIO);
-			bool targetIsAudio = (targetOutput->type == OutputType::AUDIO);
-			if (sourceIsAudio != targetIsAudio) {
+			OutputType sourceType = sourceClip->output->type;
+			OutputType targetType = targetOutput->type;
+			bool bothInstruments = outputTypeIsInstrument(sourceType) && outputTypeIsInstrument(targetType);
+			if (!bothInstruments && sourceType != targetType) {
 				display->displayPopup(l10n::get(l10n::String::STRING_FOR_CANT_CONVERT_TYPE));
 				return nullptr;
 			}
+		}
+		// An FX clip can't be cloned into a new track - there's only one FX track per song
+		else if (sourceClip->output->type == OutputType::AUDIO_FX) {
+			display->displayPopup(l10n::get(l10n::String::STRING_FOR_CANT_CONVERT_TYPE));
+			return nullptr;
 		}
 
 		// First we make an identical copy
@@ -4118,7 +4207,10 @@ ActionResult SessionView::clipCreationButtonPressed(hid::Button i, bool on, bool
 	using namespace deluge::hid::button;
 	OutputType toCreate = buttonToOutputType(i);
 	if (toCreate != OutputType::NONE) {
-		context_menu::clip_settings::newClipType.toCreate = toCreate;
+		// SELECT_ENC accepts whichever LED-less option (Audio / FX) is currently scrolled to in the menu
+		if (i != SELECT_ENC || context_menu::clip_settings::newClipType.toCreate == OutputType::NONE) {
+			context_menu::clip_settings::newClipType.toCreate = toCreate;
+		}
 		exitTrackCreation();
 		return ActionResult::ACTIONED_AND_CAUSED_CHANGE;
 	}
@@ -4395,7 +4487,7 @@ void SessionView::gridHandlePadsWithMidiLearnPressed(int32_t x, int32_t on, Clip
 		if (clip->type != ClipType::AUDIO) {
 			// Learn + Holding pad = Learn MIDI channel
 			Output* output = gridTrackFromX(x, gridTrackCount());
-			if (output && (output->type != OutputType::AUDIO && output->type != OutputType::NONE)) {
+			if (output && outputTypeIsInstrument(output->type)) {
 				view.instrumentMidiLearnPadPressed(on, (Instrument*)output);
 			}
 		}
