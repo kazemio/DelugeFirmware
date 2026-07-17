@@ -1864,6 +1864,13 @@ void ArrangerView::transitionToClipView(ClipInstance* clipInstance) {
 
 		automationView.renderMainPads(0xFFFFFFFF, &PadLEDs::imageStore[1], &PadLEDs::occupancyMaskStore[1], false);
 	}
+	else if (clip->type == ClipType::FX) {
+		// FX clips never have a sample - go straight to their (audio clip style) view
+		currentUIMode = UI_MODE_NONE;
+		changeRootUI(&audioClipView);
+
+		return;
+	}
 	else if (clip->type == ClipType::AUDIO) {
 		// If no sample, just skip directly there
 		if (!((AudioClip*)clip)->sampleHolder.audioFile) {
@@ -1946,10 +1953,11 @@ bool ArrangerView::transitionToArrangementEditor() {
 
 	Sample* sample;
 
-	if (getCurrentClip()->type == ClipType::AUDIO && getCurrentUI() != &automationView) {
+	if (getCurrentClip()->type != ClipType::INSTRUMENT && getCurrentUI() != &automationView) {
 
-		// If no sample, just skip directly there
-		if (!getCurrentAudioClip()->sampleHolder.audioFile) {
+		// If no sample (always the case for FX clips), just skip directly there
+		AudioClip* audioClip = getCurrentAudioClip();
+		if (!audioClip || !audioClip->sampleHolder.audioFile) {
 			changeRootUI(&arrangerView);
 			return true;
 		}
