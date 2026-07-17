@@ -146,10 +146,10 @@ int32_t findShadowingOwner(const Macro* macros, uint16_t destination, int32_t ma
 }
 
 // macros[] lives on Output, but editedByUser (which gates instrument preset-save) is an Instrument
-// member - AudioOutput isn't an Instrument. So mark the host edited only when it IS an Instrument
-// (every non-AUDIO macro host - MelodicInstrument, Kit - is one); audio-clip macros have no such flag.
+// member - AudioOutput and FXOutput aren't Instruments. So mark the host edited only when it IS an
+// Instrument (MelodicInstrument, Kit); audio-clip and FX-clip macros have no such flag.
 void markHostEdited(Output* host) {
-	if (host->type != OutputType::AUDIO) {
+	if (host->type != OutputType::AUDIO && host->type != OutputType::AUDIO_FX) {
 		static_cast<Instrument*>(host)->editedByUser = true;
 	}
 }
@@ -396,7 +396,8 @@ Domain domainForOutput(Output* output) {
 	case OutputType::SYNTH:
 		return Domain::SYNTH;
 	case OutputType::AUDIO:
-	case OutputType::KIT: // kit-global (affect-entire) params, same UNPATCHED_GLOBAL space as audio clips
+	case OutputType::KIT:      // kit-global (affect-entire) params, same UNPATCHED_GLOBAL space as audio clips
+	case OutputType::AUDIO_FX: // FX clips drive the song-master chain through the same UNPATCHED_GLOBAL space
 		return Domain::GLOBAL;
 	default:
 		return Domain::MIDI;
@@ -411,7 +412,8 @@ Output* macroHost(Clip* clip) {
 	case OutputType::MIDI_OUT:
 	case OutputType::SYNTH:
 	case OutputType::AUDIO:
-	case OutputType::KIT: // kit-global macros (affect-entire params)
+	case OutputType::KIT:      // kit-global macros (affect-entire params)
+	case OutputType::AUDIO_FX: // FX-clip macros drive the song-master chain params
 		return clip->output;
 	default: // CV has no macro-capable param space
 		return nullptr;

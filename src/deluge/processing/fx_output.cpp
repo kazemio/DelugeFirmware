@@ -53,6 +53,12 @@ bool FXOutput::writeDataToFile(Serializer& writer, Clip* clipForSavingOutputOnly
 		}
 	}
 
+	// The GLOBAL-domain macros block (FX-clip macros live on this Output, like audio-clip macros
+	// live on theirs). Only written when a macro deviates from its defaults.
+	if (Macros::anyMacroConfigured(macros)) {
+		Macros::writeMacrosToFile(writer, macros, Macros::domainForOutput(this));
+	}
+
 	return true;
 }
 
@@ -69,6 +75,11 @@ Error FXOutput::readFromFile(Deserializer& reader, Song* song, Clip* clip, int32
 			GlobalEffectable::initParams(&paramManager);
 			GlobalEffectable::readParamsFromFile(reader, &paramManager, readAutomationUpToPos);
 			reader.exitTag("params");
+		}
+
+		else if (!strcmp(tagName, "macros")) {
+			Macros::readMacrosFromFile(reader, macros, Macros::domainForOutput(this));
+			reader.exitTag();
 		}
 
 		else if (Output::readTagFromFile(reader, tagName)) {}

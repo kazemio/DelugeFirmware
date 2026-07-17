@@ -3149,8 +3149,8 @@ void AutomationView::selectGlobalParam(int32_t offset, Clip* clip) {
 		clip->lastSelectedParamArrayPosition = idx;
 	}
 	else if (clip->output->type == OutputType::AUDIO_FX) {
-		// FX clips drive the song master chain, so they get the arranger exclusion set
-		// (including the macro lanes - an FXOutput can't host macros)
+		// FX clips drive the song master chain, so they get the arranger exclusion set - but unlike
+		// the arranger they host macros (FXOutput is a GLOBAL host), so their lanes stay scrollable
 		auto idx = getNextSelectedParamArrayPosition(offset, clip->lastSelectedParamArrayPosition,
 		                                             kNumGlobalParamsForAutomation);
 		auto [kind, id] = globalParamsForAutomation[idx];
@@ -3158,7 +3158,7 @@ void AutomationView::selectGlobalParam(int32_t offset, Clip* clip) {
 			while ((id == params::UNPATCHED_PITCH_ADJUST || id == params::UNPATCHED_SIDECHAIN_SHAPE
 			        || id == params::UNPATCHED_SIDECHAIN_VOLUME || id == params::UNPATCHED_COMPRESSOR_THRESHOLD
 			        || (id >= params::UNPATCHED_FIRST_ARP_PARAM && id <= params::UNPATCHED_LAST_ARP_PARAM)
-			        || id == params::UNPATCHED_ARP_RATE || skipGlobalMacroLaneInScroll(id, false))) {
+			        || id == params::UNPATCHED_ARP_RATE || skipGlobalMacroLaneInScroll(id, true))) {
 
 				if (offset < 0) {
 					offset -= 1;

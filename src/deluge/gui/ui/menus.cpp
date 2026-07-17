@@ -1777,6 +1777,19 @@ menu_item::Submenu soundEditorRootMenuSongView{
     },
 };
 
+// Root menu for FX clips: the song FX surface their ParamManager drives, plus the (track) Macros
+// menu - an FXOutput is a GLOBAL macro host like an audio clip. Separate from the song-view root so
+// the Macros entry never appears in real song/arranger menu contexts.
+menu_item::Submenu soundEditorRootMenuFXClip{
+    STRING_FOR_SONG,
+    {
+        &songMasterMenu,
+        &globalFiltersMenu,
+        &globalFXMenu,
+        &macrosMenu,
+    },
+};
+
 menu_item::Submenu kitGlobalFXActionsMenu{
     STRING_FOR_ACTIONS,
     {

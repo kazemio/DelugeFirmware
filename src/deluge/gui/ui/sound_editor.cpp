@@ -1756,8 +1756,9 @@ doMIDIOrCV:
 			}
 
 			else if (clip->type == ClipType::FX) {
-				// FX clips edit the song master FX chain, so they get the song FX menu
-				newItem = &soundEditorRootMenuSongView;
+				// FX clips edit the song master FX chain, so they get the song FX surface -
+				// plus the Macros menu (an FXOutput hosts GLOBAL macros like an audio clip)
+				newItem = &soundEditorRootMenuFXClip;
 			}
 
 			else {

@@ -65,6 +65,7 @@ extern gui::menu_item::Submenu soundEditorRootMenuGateDrum;
 extern gui::menu_item::Submenu soundEditorRootMenuAudioClip;
 extern gui::menu_item::Submenu soundEditorRootMenuPerformanceView;
 extern gui::menu_item::Submenu soundEditorRootMenuSongView;
+extern gui::menu_item::Submenu soundEditorRootMenuFXClip;
 extern gui::menu_item::Submenu soundEditorRootMenuKitGlobalFX;
 extern gui::menu_item::Submenu soundEditorRootMenu;
 extern gui::menu_item::Submenu settingsRootMenu;

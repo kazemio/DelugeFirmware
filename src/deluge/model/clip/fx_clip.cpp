@@ -22,6 +22,7 @@
 #include "model/model_stack.h"
 #include "model/output.h"
 #include "model/song/song.h"
+#include "modulation/macros/macros.h"
 #include "modulation/params/param_manager.h"
 #include "modulation/params/param_set.h"
 #include "processing/fx_output.h"
@@ -150,6 +151,15 @@ void FXClip::setPos(ModelStackWithTimelineCounter* modelStack, int32_t newPos, b
 	Clip::setPos(modelStack, newPos, useActualPosForParamManagers);
 
 	setPosForParamManagers(modelStack, useActualPosForParamManagers);
+}
+
+void FXClip::processCurrentPos(ModelStackWithTimelineCounter* modelStack, uint32_t ticksSinceLast) {
+	Clip::processCurrentPos(modelStack, ticksSinceLast);
+
+	// Macros: Clip::processCurrentPos above advanced each macro's lane param; drive each automated
+	// macro's targets live from its lane value (the lane is the source of truth on playback). Same
+	// GLOBAL-domain hook AudioClip runs - FXOutput hosts macros over the song-master params.
+	Macros::applyMacroLaneAutomation(this, modelStack);
 }
 
 bool FXClip::shiftHorizontally(ModelStackWithTimelineCounter* modelStack, int32_t amount, bool shiftAutomation,

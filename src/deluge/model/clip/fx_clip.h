@@ -46,6 +46,7 @@ public:
 	Error setOutput(ModelStackWithTimelineCounter* modelStack, Output* newOutput,
 	                FXClip* favourClipForCloningParamManager = nullptr);
 	void setPos(ModelStackWithTimelineCounter* modelStack, int32_t newPos, bool useActualPosForParamManagers) override;
+	void processCurrentPos(ModelStackWithTimelineCounter* modelStack, uint32_t ticksSinceLast) override;
 	bool shiftHorizontally(ModelStackWithTimelineCounter* modelStack, int32_t amount, bool shiftAutomation,
 	                       bool shiftSequenceAndMPE) override;
 	RGB getColour();
