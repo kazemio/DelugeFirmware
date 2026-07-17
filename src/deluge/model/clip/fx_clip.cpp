@@ -32,8 +32,6 @@
 #include <new>
 
 FXClip::FXClip() : Clip(ClipType::FX) {
-	// An FX clip IS automation - it always opens into automation view
-	onAutomationClipView = true;
 }
 
 // Will replace the Clip in the modelStack, if success.
