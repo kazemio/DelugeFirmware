@@ -117,8 +117,7 @@ Instrument* getCurrentInstrument() {
 	if (output == nullptr) {
 		return nullptr;
 	}
-	auto outputType = output->type;
-	if (outputType == OutputType::AUDIO || outputType == OutputType::NONE) {
+	if (!outputTypeIsInstrument(output->type)) {
 		return nullptr;
 	}
 
