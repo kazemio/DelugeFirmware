@@ -33,7 +33,7 @@
 // four entries are the macro automation lanes (skipped while the macro feature is off, and always
 // on kit rows); they are lane selections only, never target destinations.
 constexpr int32_t kNumMacroLanesForAutomation = 4;
-constexpr int32_t kNumNonGlobalParamsForAutomation = 87;
+constexpr int32_t kNumNonGlobalParamsForAutomation = 88;
 extern const std::array<std::pair<deluge::modulation::params::Kind, deluge::modulation::params::ParamType>,
                         kNumNonGlobalParamsForAutomation>
     nonGlobalParamsForAutomation;
@@ -41,7 +41,7 @@ extern const std::array<std::pair<deluge::modulation::params::Kind, deluge::modu
 // Audio-clip / kit-global params in automation-view scroll order. Also the canonical destination
 // order for the macro system's GLOBAL-target pickers. Like the synth list above, the first four
 // entries are the macro automation lanes (lane selections only, never target destinations).
-constexpr int32_t kNumGlobalParamsForAutomation = 43;
+constexpr int32_t kNumGlobalParamsForAutomation = 44;
 extern const std::array<std::pair<deluge::modulation::params::Kind, deluge::modulation::params::ParamType>,
                         kNumGlobalParamsForAutomation>
     globalParamsForAutomation;

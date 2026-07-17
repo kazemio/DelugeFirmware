@@ -283,6 +283,7 @@ char const* getParamDisplayName(Kind kind, int32_t p) {
 		    [UNPATCHED_TREBLE_FREQ] = STRING_FOR_TREBLE_FREQUENCY,
 		    [UNPATCHED_SAMPLE_RATE_REDUCTION] = STRING_FOR_DECIMATION,
 		    [UNPATCHED_BITCRUSHING] = STRING_FOR_BITCRUSH,
+		    [UNPATCHED_SATURATION] = STRING_FOR_SATURATION,
 		    [UNPATCHED_MOD_FX_OFFSET] = STRING_FOR_MODFX_OFFSET,
 		    [UNPATCHED_MOD_FX_FEEDBACK] = STRING_FOR_MODFX_FEEDBACK,
 		    [UNPATCHED_SIDECHAIN_SHAPE] = STRING_FOR_SIDECHAIN_SHAPE,
@@ -536,6 +537,9 @@ constexpr char const* paramNameForFileConst(Kind const kind, ParamType const par
 
 		case UNPATCHED_BITCRUSHING:
 			return "bitcrushAmount";
+
+		case UNPATCHED_SATURATION:
+			return "saturationAmount";
 
 		case UNPATCHED_MOD_FX_OFFSET:
 			return "modFXOffset";

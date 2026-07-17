@@ -1271,6 +1271,14 @@ Error Sound::readTagFromFileOrError(Deserializer& reader, char const* tagName, P
 		reader.exitTag("reverbAmount");
 	}
 
+	// Legacy saturation amount, from before it was a param
+	else if (!strcmp(tagName, "clippingAmount")) {
+		ENSURE_PARAM_MANAGER_EXISTS
+		unpatchedParams->params[params::UNPATCHED_SATURATION].setCurrentValueBasicForSetup(
+		    saturationParamValueFromLegacyClipping(reader.readTagOrAttributeValueInt()));
+		reader.exitTag("clippingAmount");
+	}
+
 	else if (!strcmp(tagName, "defaultParams")) {
 		ENSURE_PARAM_MANAGER_EXISTS
 		Sound::readParamsFromFile(reader, paramManager, readAutomationUpToPos);
@@ -2385,6 +2393,9 @@ void Sound::render(ModelStackWithThreeMainThings* modelStack, std::span<StereoSa
 	}
 
 	ParamManagerForTimeline* paramManager = (ParamManagerForTimeline*)modelStack->paramManager;
+
+	// Refresh the saturation amount the voices will render with, so automation takes effect
+	updateSaturationAmountFromParam(paramManager);
 
 	// Do global LFO
 	if (paramManager->getPatchCableSet()->isSourcePatchedToSomething(PatchSource::LFO_GLOBAL_1)) {

@@ -756,6 +756,17 @@ ohNo:
 	}
 }
 
+void GlobalEffectable::processSaturation(std::span<StereoSample> buffer, ParamManager* paramManager) {
+	updateSaturationAmountFromParam(paramManager);
+	if (clippingAmount != 0u) {
+		int32_t shiftAmount = getShiftAmountForSaturation();
+		for (StereoSample& sample : buffer) {
+			sample.l = saturate(sample.l, &lastSaturationTanHWorkingValue[0], shiftAmount);
+			sample.r = saturate(sample.r, &lastSaturationTanHWorkingValue[1], shiftAmount);
+		}
+	}
+}
+
 void GlobalEffectable::setupFilterSetConfig(int32_t* postFXVolume, ParamManager* paramManager) {
 
 	UnpatchedParamSet* unpatchedParams = paramManager->getUnpatchedParamSet();
@@ -1098,6 +1109,20 @@ Error GlobalEffectable::readTagFromFile(Deserializer& reader, char const* tagNam
 
 		GlobalEffectable::readParamsFromFile(reader, paramManager, readAutomationUpToPos);
 		reader.exitTag("defaultParams");
+	}
+
+	// Legacy saturation amount, from before it was a param
+	else if (paramManager && !strcmp(tagName, "clippingAmount")) {
+		if (!paramManager->containsAnyMainParamCollections()) {
+			Error error = paramManager->setupUnpatched();
+			if (error != Error::NONE) {
+				return error;
+			}
+			initParams(paramManager);
+		}
+		paramManager->getUnpatchedParamSet()->params[params::UNPATCHED_SATURATION].setCurrentValueBasicForSetup(
+		    saturationParamValueFromLegacyClipping(reader.readTagOrAttributeValueInt()));
+		reader.exitTag("clippingAmount");
 	}
 
 	else if (!strcmp(tagName, "modFXType")) {

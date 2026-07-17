@@ -180,9 +180,10 @@ const std::array<std::pair<params::Kind, ParamType>, kNumNonGlobalParamsForAutom
     {params::Kind::PATCHED, params::GLOBAL_DELAY_FEEDBACK},
     // Sidechain Shape
     {params::Kind::UNPATCHED_SOUND, params::UNPATCHED_SIDECHAIN_SHAPE},
-    // Decimation, Bitcrush, Wavefolder
+    // Decimation, Bitcrush, Saturation, Wavefolder
     {params::Kind::UNPATCHED_SOUND, params::UNPATCHED_SAMPLE_RATE_REDUCTION},
     {params::Kind::UNPATCHED_SOUND, params::UNPATCHED_BITCRUSHING},
+    {params::Kind::UNPATCHED_SOUND, params::UNPATCHED_SATURATION},
     {params::Kind::PATCHED, params::LOCAL_FOLD},
     // OSC 1 Volume, Pitch, Pulse Width, Carrier Feedback, Wave Index
     {params::Kind::PATCHED, params::LOCAL_OSC_A_VOLUME},
@@ -305,9 +306,10 @@ const std::array<std::pair<params::Kind, ParamType>, kNumGlobalParamsForAutomati
     // Sidechain Send, Shape
     {params::Kind::UNPATCHED_GLOBAL, params::UNPATCHED_SIDECHAIN_VOLUME},
     {params::Kind::UNPATCHED_GLOBAL, params::UNPATCHED_SIDECHAIN_SHAPE},
-    // Decimation, Bitcrush
+    // Decimation, Bitcrush, Saturation
     {params::Kind::UNPATCHED_GLOBAL, params::UNPATCHED_SAMPLE_RATE_REDUCTION},
     {params::Kind::UNPATCHED_GLOBAL, params::UNPATCHED_BITCRUSHING},
+    {params::Kind::UNPATCHED_GLOBAL, params::UNPATCHED_SATURATION},
     // Mod FX Offset, Feedback, Depth, Rate
     {params::Kind::UNPATCHED_GLOBAL, params::UNPATCHED_MOD_FX_OFFSET},
     {params::Kind::UNPATCHED_GLOBAL, params::UNPATCHED_MOD_FX_FEEDBACK},
