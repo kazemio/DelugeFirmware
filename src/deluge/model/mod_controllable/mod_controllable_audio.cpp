@@ -135,6 +135,8 @@ void ModControllableAudio::initParams(ParamManager* paramManager) {
 
 	unpatchedParams->params[params::UNPATCHED_BITCRUSHING].setCurrentValueBasicForSetup(-2147483648);
 
+	unpatchedParams->params[params::UNPATCHED_SATURATION].setCurrentValueBasicForSetup(-2147483648);
+
 	unpatchedParams->params[params::UNPATCHED_SIDECHAIN_SHAPE].setCurrentValueBasicForSetup(-601295438);
 	unpatchedParams->params[params::UNPATCHED_COMPRESSOR_THRESHOLD].setCurrentValueBasicForSetup(0);
 }
@@ -276,6 +278,19 @@ bool ModControllableAudio::isSRREnabled(ParamManager* paramManager) {
 	return (unpatchedParams->getValue(params::UNPATCHED_SAMPLE_RATE_REDUCTION) != -2147483648);
 }
 
+// Converts the param's full int32 range to the 0-15 range the saturation DSP works in
+void ModControllableAudio::updateSaturationAmountFromParam(ParamManager* paramManager) {
+	uint32_t positivePreset =
+	    (uint32_t)paramManager->getUnpatchedParamSet()->getValue(params::UNPATCHED_SATURATION) + 2147483648u;
+	clippingAmount = positivePreset >> 28;
+}
+
+// For files from before saturation was a param, where it was stored as the raw 0-15 amount
+int32_t ModControllableAudio::saturationParamValueFromLegacyClipping(int32_t legacyClippingAmount) {
+	legacyClippingAmount = std::clamp<int32_t>(legacyClippingAmount, 0, 15);
+	return (int32_t)(((uint32_t)legacyClippingAmount << 28) - 2147483648u);
+}
+
 void ModControllableAudio::processSRRAndBitcrushing(std::span<StereoSample> buffer, int32_t* postFXVolume,
                                                     ParamManager* paramManager) {
 	uint32_t bitCrushMaskForSRR = 0xFFFFFFFF;
@@ -409,9 +424,6 @@ void ModControllableAudio::writeAttributesToFile(Serializer& writer) {
 	// Community Firmware parameters (always write them after the official ones, just before closing the parent tag)
 	writer.writeAttribute("hpfMode", (char*)lpfTypeToString(hpfMode));
 	writer.writeAttribute("filterRoute", (char*)filterRouteToString(filterRoute));
-	if (clippingAmount) {
-		writer.writeAttribute("clippingAmount", clippingAmount);
-	}
 }
 
 void ModControllableAudio::writeTagsToFile(Serializer& writer) {
@@ -503,6 +515,8 @@ void ModControllableAudio::writeParamAttributesToFile(Serializer& writer, ParamM
 	// Community Firmware parameters (always write them after the official ones, just before closing the parent tag)
 	unpatchedParams->writeParamAsAttribute(writer, "compressorThreshold", params::UNPATCHED_COMPRESSOR_THRESHOLD,
 	                                       writeAutomation, false, valuesForOverride);
+	unpatchedParams->writeParamAsAttribute(writer, "saturationAmount", params::UNPATCHED_SATURATION, writeAutomation,
+	                                       false, valuesForOverride);
 
 	unpatchedParams->writeParamAsAttribute(writer, "arpeggiatorGate", params::UNPATCHED_ARP_GATE, writeAutomation);
 	unpatchedParams->writeParamAsAttribute(writer, "noteProbability", params::UNPATCHED_NOTE_PROBABILITY,
@@ -597,6 +611,11 @@ bool ModControllableAudio::readParamTagFromFile(Deserializer& reader, char const
 		unpatchedParams->readParam(reader, unpatchedParamsSummary, params::UNPATCHED_BITCRUSHING,
 		                           readAutomationUpToPos);
 		reader.exitTag("bitCrush");
+	}
+
+	else if (!strcmp(tagName, "saturationAmount")) {
+		unpatchedParams->readParam(reader, unpatchedParamsSummary, params::UNPATCHED_SATURATION, readAutomationUpToPos);
+		reader.exitTag("saturationAmount");
 	}
 
 	else if (!strcmp(tagName, "modFXOffset")) {
@@ -733,10 +752,8 @@ Error ModControllableAudio::readTagFromFile(Deserializer& reader, char const* ta
 		reader.exitTag("filterRoute");
 	}
 
-	else if (!strcmp(tagName, "clippingAmount")) {
-		clippingAmount = reader.readTagOrAttributeValueInt();
-		reader.exitTag("clippingAmount");
-	}
+	// Note: the legacy "clippingAmount" tag is converted to the UNPATCHED_SATURATION param by Sound and
+	// GlobalEffectable's readTagFromFile overrides, because a paramManager isn't reliably available here.
 
 	// Arpeggiator
 
