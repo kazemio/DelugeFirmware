@@ -59,6 +59,7 @@ class MIDIInstrument;
 class NoteRow;
 class Output;
 class AudioOutput;
+class FXOutput;
 class ModelStack;
 class ModelStackWithTimelineCounter;
 Clip* getCurrentClip();
@@ -351,6 +352,11 @@ public:
 	Instrument* changeOutputType(Instrument* oldInstrument, OutputType newOutputType);
 	AudioOutput* getFirstAudioOutput();
 	AudioOutput* createNewAudioOutput(Output* replaceOutput = nullptr);
+	FXOutput* getFXOutput();
+	FXOutput* createNewFXOutput();
+	/// The ParamManager the master output chain should currently read from: the active FXClip's if one is active,
+	/// otherwise this Song's own paramManager.
+	ParamManagerForTimeline* getActiveMasterParamManager();
 	/// buffer must have at least 5 characters on 7seg, or 30 for OLED
 	void getNoteLengthName(StringBuf& buffer, uint32_t noteLength, char const* notesString = "-notes",
 	                       bool clarifyPerColumn = false) const;
