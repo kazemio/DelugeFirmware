@@ -2896,11 +2896,11 @@ void SessionView::transitionToViewForClip(Clip* clip) {
 		iterateAndCallSpecificDeviceHook(MIDICableUSBHosted::Hook::HOOK_ON_TRANSITION_TO_SESSION_VIEW);
 	}
 
-	// AudioClips
+	// AudioClips (and FX clips, which never have a sample)
 	else {
 		AudioClip* clip = getCurrentAudioClip();
 
-		Sample* sample = (Sample*)clip->sampleHolder.audioFile;
+		Sample* sample = clip ? (Sample*)clip->sampleHolder.audioFile : nullptr;
 
 		if (sample) {
 
@@ -2930,9 +2930,8 @@ void SessionView::transitionToSessionView() {
 		return;
 	}
 
-	if (getCurrentClip()->type == ClipType::AUDIO && getCurrentUI() != &automationView) {
-		AudioClip* clip = getCurrentAudioClip();
-		// !clip probably couldn't happen, but just in case...
+	if (getCurrentClip()->type != ClipType::INSTRUMENT && getCurrentUI() != &automationView) {
+		AudioClip* clip = getCurrentAudioClip(); // nullptr for FX clips - they take the no-sample path
 		if (!clip || !clip->sampleHolder.audioFile) {
 			memcpy(PadLEDs::imageStore, PadLEDs::image, sizeof(PadLEDs::image));
 			finishedTransitioningHere();
@@ -4610,9 +4609,10 @@ ActionResult SessionView::gridHandleScroll(int32_t offsetX, int32_t offsetY) {
 void SessionView::gridTransitionToSessionView() {
 	Sample* sample;
 
-	if (getCurrentClip()->type == ClipType::AUDIO && getCurrentUI() != &automationView) {
-		// If no sample, just skip directly there
-		if (!getCurrentAudioClip()->sampleHolder.audioFile) {
+	if (getCurrentClip()->type != ClipType::INSTRUMENT && getCurrentUI() != &automationView) {
+		// If no sample (always the case for FX clips), just skip directly there
+		AudioClip* audioClip = getCurrentAudioClip();
+		if (!audioClip || !audioClip->sampleHolder.audioFile) {
 			changeRootUI(&sessionView);
 			memcpy(PadLEDs::imageStore, PadLEDs::image, sizeof(PadLEDs::image));
 			finishedTransitioningHere();
@@ -4685,6 +4685,12 @@ void SessionView::gridTransitionToViewForClip(Clip* clip) {
 		}
 
 		automationView.renderMainPads(0xFFFFFFFF, &PadLEDs::imageStore[1], &PadLEDs::occupancyMaskStore[1], false);
+	}
+	else if (clip->type == ClipType::FX) {
+		// FX clips never have a sample - go straight to their (audio clip style) view
+		currentUIMode = UI_MODE_NONE;
+		changeRootUI(&audioClipView);
+		return;
 	}
 	else if (clip->type == ClipType::AUDIO) {
 		// If no sample, just skip directly there
