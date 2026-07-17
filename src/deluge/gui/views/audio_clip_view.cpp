@@ -59,11 +59,14 @@ using namespace deluge::gui;
 PLACE_SDRAM_BSS AudioClipView audioClipView{};
 
 inline Sample* getSample() {
-	AudioClip& clip = *getCurrentAudioClip();
-	if (clip.getCurrentlyRecordingLinearly()) {
-		return clip.recorder->sample;
+	AudioClip* clip = getCurrentAudioClip();
+	if (!clip) {
+		return nullptr; // e.g. an FXClip - never has a sample
 	}
-	return static_cast<Sample*>(clip.sampleHolder.audioFile);
+	if (clip->getCurrentlyRecordingLinearly()) {
+		return clip->recorder->sample;
+	}
+	return static_cast<Sample*>(clip->sampleHolder.audioFile);
 }
 
 bool AudioClipView::opened() {
@@ -431,7 +434,7 @@ dontDeactivateMarker:
 			ModelStackWithTimelineCounter* modelStack =
 			    setupModelStackWithTimelineCounter(modelStackMemory, currentSong, getCurrentClip());
 
-			getCurrentAudioClip()->clear(action, modelStack, !FlashStorage::automationClear, true);
+			getCurrentClip()->clear(action, modelStack, !FlashStorage::automationClear, true);
 
 			// New default as part of Automation Clip View Implementation
 			// If this is enabled, then when you are in Audio Clip View, clearing
@@ -476,7 +479,7 @@ deactivateMarkerIfNecessary:
 ActionResult AudioClipView::padAction(int32_t x, int32_t y, int32_t on) {
 	if (x < kDisplayWidth) {
 		if (Buttons::isButtonPressed(deluge::hid::button::TEMPO_ENC)) {
-			if (on) {
+			if (on && getCurrentAudioClip()) {
 				playbackHandler.grabTempoFromClip(getCurrentAudioClip());
 			}
 		}
@@ -731,6 +734,10 @@ void AudioClipView::selectEncoderAction(int8_t offset) {
 	if (currentUIMode) {
 		return;
 	}
+	// nothing to navigate or scroll for an FX clip - there's only one FX track and no output modes
+	if (!getCurrentAudioClip()) {
+		return;
+	}
 	// allows you to assign an audio clip to a different audio track
 	if (Buttons::isShiftButtonPressed()) {
 		view.navigateThroughAudioOutputsForAudioClip(offset, getCurrentAudioClip());
@@ -742,7 +749,12 @@ void AudioClipView::selectEncoderAction(int8_t offset) {
 }
 
 void AudioClipView::setClipLengthEqualToSampleLength() {
-	AudioClip& audioClip = *getCurrentAudioClip();
+	AudioClip* audioClipPtr = getCurrentAudioClip();
+	if (!audioClipPtr) {
+		display->displayPopup(deluge::l10n::get(deluge::l10n::String::STRING_FOR_NO_SAMPLE));
+		return;
+	}
+	AudioClip& audioClip = *audioClipPtr;
 	SamplePlaybackGuide guide = audioClip.guide;
 	SampleHolder* sampleHolder = (SampleHolder*)guide.audioFileHolder;
 	if (sampleHolder) {
@@ -816,18 +828,21 @@ ActionResult AudioClipView::editClipLengthWithoutTimestretching(int32_t offset) 
 	}
 
 	int32_t oldLength = getCurrentClip()->loopLength;
-	uint64_t oldLengthSamples = getCurrentAudioClip()->sampleHolder.getDurationInSamples(true);
 
 	Action* action = nullptr;
 	uint32_t newLength = changeClipLength(offset, oldLength, action);
 
-	AudioClip& audioClip = *getCurrentAudioClip();
-	SamplePlaybackGuide guide = audioClip.guide;
-	SampleHolder* sampleHolder = (SampleHolder*)guide.audioFileHolder;
-	if (sampleHolder) {
-		Sample* sample = static_cast<Sample*>(sampleHolder->audioFile);
-		if (sample) {
-			changeUnderlyingSampleLength(audioClip, sample, newLength, oldLength, oldLengthSamples);
+	AudioClip* audioClipPtr = getCurrentAudioClip();
+	if (audioClipPtr) {
+		AudioClip& audioClip = *audioClipPtr;
+		uint64_t oldLengthSamples = audioClip.sampleHolder.getDurationInSamples(true);
+		SamplePlaybackGuide guide = audioClip.guide;
+		SampleHolder* sampleHolder = (SampleHolder*)guide.audioFileHolder;
+		if (sampleHolder) {
+			Sample* sample = static_cast<Sample*>(sampleHolder->audioFile);
+			if (sample) {
+				changeUnderlyingSampleLength(audioClip, sample, newLength, oldLength, oldLengthSamples);
+			}
 		}
 	}
 
@@ -845,14 +860,14 @@ ActionResult AudioClipView::verticalEncoderAction(int32_t offset, bool inCardRou
 		}
 
 		// Shift colour spectrum
-		getCurrentAudioClip()->colourOffset += offset;
+		getCurrentClip()->colourOffset += offset;
 		uiNeedsRendering(this, 0xFFFFFFFF, 0);
 	}
 	return ActionResult::DEALT_WITH;
 }
 
 bool AudioClipView::setupScroll(uint32_t oldScroll) {
-	if (!getCurrentAudioClip()->currentlyScrollableAndZoomable()) {
+	if (!getCurrentClip()->currentlyScrollableAndZoomable()) {
 		return false;
 	}
 	return ClipView::setupScroll(oldScroll);

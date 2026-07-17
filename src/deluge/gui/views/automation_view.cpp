@@ -1358,9 +1358,7 @@ void AutomationView::handleClipButtonAction(bool on, bool isAudioClip) {
 		if (onArrangerView) {
 			changeRootUI(&arrangerView);
 		}
-		// an FX clip's only view is the automation view, so there's nothing to go back to
-		else if (getCurrentClip()->type == ClipType::FX) {}
-		// automation audio clip view transitioning back to audio clip view
+		// automation audio clip view transitioning back to audio clip view (FX clips use it too)
 		else if (isAudioClip) {
 			changeRootUI(&audioClipView);
 		}
