@@ -200,6 +200,11 @@ void RuntimeFeatureSettings::init() {
 	SetupOnOffSetting(settings[RuntimeFeatureSettingType::ShowBatteryLevel],
 	                  STRING_FOR_COMMUNITY_FEATURE_SHOW_BATTERY_LEVEL, "showBatteryLevel",
 	                  RuntimeFeatureStateToggle::On);
+
+	// Filter Frequency Display
+	SetupOnOffSetting(settings[RuntimeFeatureSettingType::FilterFrequencyDisplay],
+	                  STRING_FOR_COMMUNITY_FEATURE_FILTER_FREQUENCY_DISPLAY, "filterFrequencyDisplay",
+	                  RuntimeFeatureStateToggle::Off);
 }
 
 void RuntimeFeatureSettings::readSettingsFromFile() {
