@@ -33,13 +33,24 @@ namespace deluge::gui::param_freq_display {
 // LFO/arp rates) the thing is free-running.
 bool shouldShowHz(deluge::modulation::params::Kind kind, int32_t paramID);
 
-// Appends e.g. "310 Hz" / "1.8 kHz" for a 0-50 menu value. compact drops the unit: "310", "1.8k".
+// How much room the target surface has:
+// FULL "310 Hz" / "2.7 kHz" / "46 ms"  - full-screen menu lines, macro range popups
+// SHORT "310Hz" / "2.7k" / "46ms"      - one-line popups/notifications where the title competes
+// COMPACT "310" / "2.7k" / "46ms"      - tiny horizontal-menu slots
+enum class Style : uint8_t { FULL, SHORT, COMPACT };
+
+// Appends the converted reading for a 0-50 menu value.
 void appendHzForMenuValue(deluge::modulation::params::Kind kind, int32_t paramID, int32_t menuValue, StringBuf& buf,
-                          bool compact = false);
+                          Style style = Style::FULL);
 
 // Same for a 0-128 knob position (centre 64), the space used by gold-knob popups and macro targets.
 void appendHzForKnobPos(deluge::modulation::params::Kind kind, int32_t paramID, int32_t knobPos, StringBuf& buf,
-                        bool compact = false);
+                        Style style = Style::FULL);
+
+// Appends " (310Hz)" after an already-written value if the param converts; no-op otherwise. For
+// one-line value notifications (horizontal menu banner).
+void appendShortSuffixForMenuValue(deluge::modulation::params::Kind kind, int32_t paramID, int32_t menuValue,
+                                   StringBuf& buf);
 
 // Draws the Hz reading as a small centred line under the big value of a full-screen OLED menu.
 // No-op when the flag is off or the param has no Hz meaning.
