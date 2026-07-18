@@ -324,9 +324,8 @@ void appendShortSuffixForMenuValue(params::Kind kind, int32_t paramID, int32_t m
 	if (!shouldShowHz(kind, paramID)) {
 		return;
 	}
-	buf.append(" (");
+	buf.append(' ');
 	appendHzForMenuValue(kind, paramID, menuValue, buf, Style::SHORT);
-	buf.append(")");
 }
 
 void drawMenuHzLine(params::Kind kind, int32_t paramID, int32_t menuValue) {
