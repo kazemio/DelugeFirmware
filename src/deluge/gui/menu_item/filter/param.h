@@ -47,13 +47,6 @@ public:
 
 	void getColumnLabel(StringBuf& label) override { label.append(info.getMorphNameOr(Integer::getName(), true)); }
 
-	void drawPixelsForOled() override {
-		Integer::drawPixelsForOled();
-		if (info.getFilterParamType() == FilterParamType::FREQUENCY) {
-			param_freq_display::drawMenuHzLine(getParamKind(), getP(), getValue());
-		}
-	}
-
 	void renderInHorizontalMenu(const SlotPosition& slot) override {
 		if (info.getFilterParamType() == FilterParamType::MORPH && info.isMorphable()) {
 			int32_t value = getValue();
@@ -100,13 +93,6 @@ public:
 	}
 	void getColumnLabel(StringBuf& label) override { label.append(info.getMorphNameOr(Integer::getName(), true)); }
 	[[nodiscard]] FilterInfo const& getFilterInfo() const { return info; }
-
-	void drawPixelsForOled() override {
-		UnpatchedParam::drawPixelsForOled();
-		if (info.getFilterParamType() == FilterParamType::FREQUENCY) {
-			param_freq_display::drawMenuHzLine(getParamKind(), getP(), getValue());
-		}
-	}
 
 	void renderInHorizontalMenu(const SlotPosition& slot) override {
 		if (info.getFilterParamType() == FilterParamType::MORPH && info.isMorphable()) {
