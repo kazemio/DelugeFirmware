@@ -34,7 +34,7 @@ public:
 	void drawValue() override { display->setTextAsNumber(this->getValue(), shouldDrawDotOnName()); }
 
 	// Adds the real-world unit reading (Hz / ms) under the value for convertible params, when the
-	// FilterFrequencyDisplay community feature is on. No-op for everything else.
+	// ShowRealUnits community feature is on. No-op for everything else.
 	void drawPixelsForOled() override {
 		IntegerContinuous::drawPixelsForOled();
 		param_freq_display::drawMenuHzLine(getParamKind(), getP(), this->getValue());

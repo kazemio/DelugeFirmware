@@ -205,9 +205,8 @@ void RuntimeFeatureSettings::init() {
 	                  RuntimeFeatureStateToggle::Off);
 
 	// Filter Frequency Display
-	SetupOnOffSetting(settings[RuntimeFeatureSettingType::FilterFrequencyDisplay],
-	                  STRING_FOR_COMMUNITY_FEATURE_FILTER_FREQUENCY_DISPLAY, "filterFrequencyDisplay",
-	                  RuntimeFeatureStateToggle::Off);
+	SetupOnOffSetting(settings[RuntimeFeatureSettingType::ShowRealUnits], STRING_FOR_COMMUNITY_FEATURE_SHOW_REAL_UNITS,
+	                  "showRealUnits", RuntimeFeatureStateToggle::Off);
 }
 
 void RuntimeFeatureSettings::readSettingsFromFile() {
