@@ -305,7 +305,7 @@ float menuValueToParamValue(int32_t menuValue) {
 } // namespace
 
 bool shouldShowHz(params::Kind kind, int32_t paramID) {
-	if (!runtimeFeatureSettings.isOn(RuntimeFeatureSettingType::FilterFrequencyDisplay)) {
+	if (!runtimeFeatureSettings.isOn(RuntimeFeatureSettingType::ShowRealUnits)) {
 		return false;
 	}
 	FreqParam which = identify(kind, paramID);

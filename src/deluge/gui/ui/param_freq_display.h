@@ -25,7 +25,7 @@
 // Display-only conversion of params stored/automated as 0-50 menu values / 0-128 knob positions
 // (nothing about storage changes) to real-world units: filter and EQ cutoffs in Hz, free-running
 // LFO / mod-FX / arp rates in Hz, and envelope attack/decay/release stage lengths in ms/s.
-// Gated behind the FilterFrequencyDisplay community feature; tempo-synced LFO/arp rates are
+// Gated behind the ShowRealUnits community feature; tempo-synced LFO/arp rates are
 // suppressed (the Hz reading would be wrong).
 namespace deluge::gui::param_freq_display {
 
