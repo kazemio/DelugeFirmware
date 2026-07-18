@@ -262,6 +262,17 @@ void showTargetKnobIndicators(Output* instrument, int32_t macroIndex, int32_t ta
 // Forward-declared: defined with the cable helpers below.
 static bool cableExists(Clip* clip, uint16_t destination);
 
+// Whether this target's endpoints render as unit readings (Hz/ms) rather than plain numbers
+static bool targetEndpointsShowUnits(Output* instrument, uint16_t destination) {
+	if (!isDomainInternal(domainForOutput(instrument)) || isCableDestination(destination)) {
+		return false;
+	}
+	params::Kind kind;
+	int32_t paramID;
+	decodeDestination(domainForOutput(instrument), destination, &kind, &paramID);
+	return gui::param_freq_display::shouldShowHz(kind, paramID);
+}
+
 void showTargetRangeReadout(Output* instrument, int32_t macroIndex, int32_t target, uint16_t destination,
                             bool showConflict) {
 	// A shadowed target doesn't drive anything - show WHO owns the destination, not a range.
@@ -291,9 +302,30 @@ void showTargetRangeReadout(Output* instrument, int32_t macroIndex, int32_t targ
 	else {
 		appendTargetName(popup, instrument, target, destination);
 		popup.append(display->haveOLED() ? '\n' : ' ');
-		appendTargetEndpoint(popup, instrument, destination, f.from);
+
+		// Unit readings vary in width ("20 Hz" ... "1.6 kHz"), which would make the popup box
+		// resize while an endpoint is dialled. Pad them into fixed-width fields (sized for the
+		// widest possible reading) so the box keeps one size and only the digits move.
+		constexpr int32_t kUnitFieldWidth = 8; // widest reading: "20.2 kHz"
+		DEF_STACK_STRING_BUF(fromField, 12);
+		appendTargetEndpoint(fromField, instrument, destination, f.from);
+		DEF_STACK_STRING_BUF(toField, 12);
+		appendTargetEndpoint(toField, instrument, destination, f.to);
+		bool padFields = targetEndpointsShowUnits(instrument, destination);
+
+		if (padFields) {
+			for (int32_t i = fromField.size(); i < kUnitFieldWidth; i++) {
+				popup.append(' ');
+			}
+		}
+		popup.append(fromField.c_str());
 		popup.append(" - ");
-		appendTargetEndpoint(popup, instrument, destination, f.to);
+		popup.append(toField.c_str());
+		if (padFields) {
+			for (int32_t i = toField.size(); i < kUnitFieldWidth; i++) {
+				popup.append(' ');
+			}
+		}
 	}
 	display->popupText(popup.c_str());
 }
