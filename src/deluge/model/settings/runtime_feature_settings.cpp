@@ -204,6 +204,11 @@ void RuntimeFeatureSettings::init() {
 	// Rounded Corners
 	SetupOnOffSetting(settings[RuntimeFeatureSettingType::RoundedCorners], STRING_FOR_COMMUNITY_FEATURE_ROUNDED_CORNERS,
 	                  "roundedCorners", RuntimeFeatureStateToggle::On);
+
+	// Filter Frequency Display
+	SetupOnOffSetting(settings[RuntimeFeatureSettingType::FilterFrequencyDisplay],
+	                  STRING_FOR_COMMUNITY_FEATURE_FILTER_FREQUENCY_DISPLAY, "filterFrequencyDisplay",
+	                  RuntimeFeatureStateToggle::Off);
 }
 
 void RuntimeFeatureSettings::factoryReset(bool showPopup) {

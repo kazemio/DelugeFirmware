@@ -15,7 +15,9 @@
  * If not, see <https://www.gnu.org/licenses/>.
  */
 #pragma once
+#include "definitions_cxx.hpp"
 #include "gui/menu_item/unpatched_param.h"
+#include "gui/ui/param_freq_display.h"
 
 namespace deluge::gui::menu_item::eq {
 
@@ -26,6 +28,20 @@ public:
 	EqUnpatchedParam(l10n::String name, int32_t newP) : UnpatchedParam(name, newP), columnLabel_{name} {}
 
 	void getColumnLabel(StringBuf& label) override { label.append(deluge::l10n::getView(columnLabel_)); }
+
+	void drawPixelsForOled() override {
+		UnpatchedParam::drawPixelsForOled();
+		// Only the BASS_FREQ/TREBLE_FREQ instances resolve to a Hz reading; gain ones no-op
+		param_freq_display::drawMenuHzLine(getParamKind(), getP(), getValue());
+	}
+
+	void renderInHorizontalMenu(const SlotPosition& slot) override {
+		if (param_freq_display::drawCompactHz(getParamKind(), getP(), getValue(), slot.start_x,
+		                                      slot.start_y + kHorizontalMenuSlotYOffset, slot.width)) {
+			return;
+		}
+		UnpatchedParam::renderInHorizontalMenu(slot);
+	}
 
 private:
 	l10n::String columnLabel_;
