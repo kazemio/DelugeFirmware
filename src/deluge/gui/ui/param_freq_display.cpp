@@ -18,8 +18,15 @@
 #include "gui/ui/param_freq_display.h"
 
 #include "definitions_cxx.hpp"
+#include "gui/views/view.h"
 #include "hid/display/oled.h"
+#include "model/clip/instrument_clip.h"
+#include "model/drum/drum.h"
+#include "model/instrument/kit.h"
 #include "model/settings/runtime_feature_settings.h"
+#include "model/song/song.h"
+#include "processing/sound/sound.h"
+#include "util/functions.h"
 
 #include <algorithm>
 #include <cmath>
@@ -35,16 +42,61 @@ namespace {
 // lookuptables tanTable): full scale = 20.2 kHz at 44.1 kHz.
 constexpr float kMaxFilterHz = 20211.4f;
 constexpr float kQ31 = 2147483648.0f;
+// LFO/mod-FX rate final values are per-sample increments of a uint32 phase (modulation/lfo.h,
+// ModFXProcessor), so Hz = value * fs / 2^32.
+constexpr float kPhasePerSample = (float)kSampleRate / 4294967296.0f;
+// Envelope stages complete when pos (advanced by finalValue per sample) reaches 2^23
+// (modulation/envelope.cpp).
+constexpr float kEnvelopeStageLength = 8388608.0f;
+// Unsynced arp: gatePos += (rate >> 5) >> 8 per sample, one note per 2^24 (arpeggiator.cpp), so
+// notes/sec = rate * fs / 2^37.
+constexpr float kArpNotesPerSample = (float)kSampleRate / 137438953472.0f;
 
-enum class FreqParam { NONE, LPF_PATCHED, HPF_PATCHED, LPF_GLOBAL, HPF_GLOBAL, BASS, TREBLE };
+enum class FreqParam {
+	NONE,
+	LPF_PATCHED,
+	HPF_PATCHED,
+	LPF_GLOBAL,
+	HPF_GLOBAL,
+	BASS,
+	TREBLE,
+	LFO_RATE,
+	MOD_FX_RATE,
+	ARP_RATE,
+	ENV_ATTACK,
+	ENV_DECAY,
+	ENV_RELEASE,
+};
+
+enum class Unit { HZ, SECONDS };
 
 FreqParam identify(params::Kind kind, int32_t paramID) {
 	if (kind == params::Kind::PATCHED) {
-		if (paramID == params::LOCAL_LPF_FREQ) {
+		switch (paramID) {
+		case params::LOCAL_LPF_FREQ:
 			return FreqParam::LPF_PATCHED;
-		}
-		if (paramID == params::LOCAL_HPF_FREQ) {
+		case params::LOCAL_HPF_FREQ:
 			return FreqParam::HPF_PATCHED;
+		case params::GLOBAL_LFO_FREQ_1:
+		case params::GLOBAL_LFO_FREQ_2:
+		case params::LOCAL_LFO_LOCAL_FREQ_1:
+		case params::LOCAL_LFO_LOCAL_FREQ_2:
+			return FreqParam::LFO_RATE;
+		case params::GLOBAL_MOD_FX_RATE:
+			return FreqParam::MOD_FX_RATE;
+		case params::GLOBAL_ARP_RATE:
+			return FreqParam::ARP_RATE;
+		default:
+			if (paramID >= params::LOCAL_ENV_0_ATTACK && paramID <= params::LOCAL_ENV_3_ATTACK) {
+				return FreqParam::ENV_ATTACK;
+			}
+			if (paramID >= params::LOCAL_ENV_0_DECAY && paramID <= params::LOCAL_ENV_3_DECAY) {
+				return FreqParam::ENV_DECAY;
+			}
+			if (paramID >= params::LOCAL_ENV_0_RELEASE && paramID <= params::LOCAL_ENV_3_RELEASE) {
+				return FreqParam::ENV_RELEASE;
+			}
+			break;
 		}
 	}
 	else if (kind == params::Kind::UNPATCHED_SOUND || kind == params::Kind::UNPATCHED_GLOBAL) {
@@ -54,86 +106,196 @@ FreqParam identify(params::Kind kind, int32_t paramID) {
 		if (paramID == params::UNPATCHED_TREBLE_FREQ) {
 			return FreqParam::TREBLE;
 		}
-		// LPF/HPF ids below exist only in the GlobalEffectable section and would collide with
-		// sound-only unpatched ids, so require the GLOBAL kind for them
+		// Ids below exist only in the GlobalEffectable section and would collide with sound-only
+		// unpatched ids, so require the GLOBAL kind for them
 		if (kind == params::Kind::UNPATCHED_GLOBAL) {
-			if (paramID == params::UNPATCHED_LPF_FREQ) {
+			switch (paramID) {
+			case params::UNPATCHED_LPF_FREQ:
 				return FreqParam::LPF_GLOBAL;
-			}
-			if (paramID == params::UNPATCHED_HPF_FREQ) {
+			case params::UNPATCHED_HPF_FREQ:
 				return FreqParam::HPF_GLOBAL;
+			case params::UNPATCHED_MOD_FX_RATE:
+				return FreqParam::MOD_FX_RATE;
+			case params::UNPATCHED_ARP_RATE:
+				return FreqParam::ARP_RATE;
+			default:
+				break;
 			}
 		}
 	}
 	return FreqParam::NONE;
 }
 
+// LFO and arp rates are only meaningful in Hz while free-running; when tempo-synced the display
+// would be wrong, so the reading is suppressed.
+bool isFreeRunning(FreqParam which, params::Kind kind, int32_t paramID) {
+	if (which == FreqParam::LFO_RATE) {
+		// Patched LFO params only exist on Sounds, so the active ModControllable is a Sound
+		auto* sound = static_cast<Sound*>(view.activeModControllableModelStack.modControllable);
+		if (sound == nullptr) {
+			return false;
+		}
+		LFO_ID lfoId;
+		switch (paramID) {
+		case params::GLOBAL_LFO_FREQ_1:
+			lfoId = LFO1_ID;
+			break;
+		case params::LOCAL_LFO_LOCAL_FREQ_1:
+			lfoId = LFO2_ID;
+			break;
+		case params::GLOBAL_LFO_FREQ_2:
+			lfoId = LFO3_ID;
+			break;
+		default:
+			lfoId = LFO4_ID;
+			break;
+		}
+		return sound->lfoConfig[lfoId].syncLevel == SYNC_LEVEL_NONE;
+	}
+	if (which == FreqParam::ARP_RATE) {
+		Clip* clip = getCurrentClip();
+		if (clip == nullptr || clip->type != ClipType::INSTRUMENT) {
+			return false;
+		}
+		auto* instrumentClip = (InstrumentClip*)clip;
+		ArpeggiatorSettings* arpSettings;
+		if (clip->output->type == OutputType::KIT && kind == params::Kind::PATCHED) {
+			// Kit row: the selected drum's arp
+			Drum* drum = ((Kit*)clip->output)->selectedDrum;
+			arpSettings = (drum != nullptr) ? &drum->arpSettings : nullptr;
+		}
+		else { // synth / MIDI / CV, and kit-global (Kit::getArpSettings resolves to the clip's too)
+			arpSettings = &instrumentClip->arpSettings;
+		}
+		return arpSettings != nullptr && arpSettings->syncLevel == SYNC_LEVEL_NONE;
+	}
+	return true;
+}
+
 // Float mirror of the firmware's own value chains, display only: getExp/paramNeutralValues
 // (util/functions.cpp), patched preset scaling by paramRanges (modulation/patch/patcher.cpp),
-// unpatched cableToExpParamShortcut (>>2), EQ one-pole setup (mod_controllable_audio.cpp).
-float computeHz(FreqParam which, float paramValue) {
-	float adjustment; // getExp units: 2^26 per octave
-	float neutral;
-	bool isOnePoleEq = false;
+// unpatched cableToExpParamShortcut (>>2), the dumb envelope hack (attack sign flip,
+// decay/release via lookupReleaseRate), EQ one-pole setup (mod_controllable_audio.cpp).
+float computeValue(FreqParam which, float paramValue, Unit& unit) {
+	unit = Unit::HZ;
 
+	// getExp adjustment per raw param unit: default patched paramRange 2^30 and the unpatched
+	// >>2 shortcut are both value/4; exceptions below
+	float adjustment = paramValue * 0.25f;
+	float neutral;
 	switch (which) {
-	case FreqParam::LPF_PATCHED: // preset scaled by paramRanges[LOCAL_LPF_FREQ] = 2^29 * 1.4
+	case FreqParam::LPF_PATCHED: // paramRanges[LOCAL_LPF_FREQ] = 2^29 * 1.4
 		adjustment = paramValue * (536870912.0f * 1.4f / 4294967296.0f);
 		neutral = 2000000.0f;
 		break;
-	case FreqParam::HPF_PATCHED: // paramRanges 2^30, identical to the unpatched >>2
-		adjustment = paramValue * 0.25f;
+	case FreqParam::HPF_PATCHED:
+	case FreqParam::HPF_GLOBAL:
 		neutral = 2672947.0f;
 		break;
 	case FreqParam::LPF_GLOBAL:
-		adjustment = paramValue * 0.25f;
 		neutral = 2000000.0f;
-		break;
-	case FreqParam::HPF_GLOBAL:
-		adjustment = paramValue * 0.25f;
-		neutral = 2672947.0f;
 		break;
 	case FreqParam::BASS: // (value >> 5) * 6
 		adjustment = paramValue * (6.0f / 32.0f);
 		neutral = 120000000.0f;
-		isOnePoleEq = true;
 		break;
 	case FreqParam::TREBLE:
 		adjustment = paramValue * (6.0f / 32.0f);
 		neutral = 700000000.0f;
-		isOnePoleEq = true;
 		break;
+	case FreqParam::LFO_RATE:
+	case FreqParam::MOD_FX_RATE:
+		neutral = 121739.0f;
+		break;
+	case FreqParam::ARP_RATE:
+		neutral = (float)kMaxSampleValue;
+		break;
+	case FreqParam::ENV_ATTACK: // paramRanges = 2^29 * 1.5; the dumb envelope hack negates
+		adjustment = -paramValue * (536870912.0f * 1.5f / 4294967296.0f);
+		neutral = 4096.0f;
+		break;
+	case FreqParam::ENV_DECAY:
+	case FreqParam::ENV_RELEASE: {
+		// finalValue = neutral * lookupReleaseRate(adjustment) / 2^32 (the dumb envelope hack)
+		float envNeutral = (which == FreqParam::ENV_DECAY) ? 35840.0f : 71680.0f;
+		auto adjInt = (int32_t)std::clamp(paramValue * 0.25f, -2147483648.0f, 2147483520.0f);
+		float rate = envNeutral * ((float)lookupReleaseRate(adjInt) / 4294967296.0f);
+		unit = Unit::SECONDS;
+		return kEnvelopeStageLength / (std::max(rate, 1.0f) * (float)kSampleRate);
+	}
 	default:
 		return 0.0f;
 	}
 
 	float value = std::min(neutral * std::exp2(adjustment / 67108864.0f), 2147483647.0f);
-	if (isOnePoleEq) {
+	switch (which) {
+	case FreqParam::BASS:
+	case FreqParam::TREBLE: { // one-pole smoothing coefficient (mod_controllable_audio.cpp)
 		float coefficient = value / 4294967296.0f;
 		return -std::log(1.0f - coefficient) * (float)kSampleRate / (2.0f * 3.14159265f);
 	}
-	return std::min(value * 32.0f, kQ31) / kQ31 * kMaxFilterHz;
+	case FreqParam::LFO_RATE:
+	case FreqParam::MOD_FX_RATE:
+		return value * kPhasePerSample;
+	case FreqParam::ARP_RATE:
+		return value * kArpNotesPerSample;
+	case FreqParam::ENV_ATTACK:
+		unit = Unit::SECONDS;
+		return kEnvelopeStageLength / (std::max(value, 1.0f) * (float)kSampleRate);
+	default: // filters: full-scale q31 (after <<5) maps to 20.2 kHz via the tan table
+		return std::min(value * 32.0f, kQ31) / kQ31 * kMaxFilterHz;
+	}
 }
 
-void appendHz(FreqParam which, float paramValue, StringBuf& buf, bool compact) {
-	float hz = computeHz(which, paramValue);
-	if (hz < 999.5f) {
-		buf.appendInt((int32_t)(hz + 0.5f));
+void appendUnitValue(float value, Unit unit, StringBuf& buf, bool compact) {
+	if (unit == Unit::SECONDS) {
+		if (value < 0.0095f) {
+			buf.appendFloat(value * 1000.0f, 1, 1);
+			buf.append(" ms");
+		}
+		else if (value < 0.9995f) {
+			buf.appendInt((int32_t)(value * 1000.0f + 0.5f));
+			buf.append(" ms");
+		}
+		else if (value < 9.95f) {
+			buf.appendFloat(value, 1, 1);
+			buf.append(" s");
+		}
+		else {
+			buf.appendInt((int32_t)(value + 0.5f));
+			buf.append(" s");
+		}
+		return;
+	}
+	if (value < 9.995f) {
+		buf.appendFloat(value, 1, 2);
 		if (!compact) {
 			buf.append(" Hz");
 		}
 	}
-	else if (hz < 9950.0f) {
-		int32_t tenthsOfKhz = (int32_t)(hz / 100.0f + 0.5f);
+	else if (value < 999.5f) {
+		buf.appendInt((int32_t)(value + 0.5f));
+		if (!compact) {
+			buf.append(" Hz");
+		}
+	}
+	else if (value < 9950.0f) {
+		int32_t tenthsOfKhz = (int32_t)(value / 100.0f + 0.5f);
 		buf.appendInt(tenthsOfKhz / 10);
 		buf.append('.');
 		buf.appendInt(tenthsOfKhz % 10);
 		buf.append(compact ? "k" : " kHz");
 	}
 	else {
-		buf.appendInt((int32_t)(hz / 1000.0f + 0.5f));
+		buf.appendInt((int32_t)(value / 1000.0f + 0.5f));
 		buf.append(compact ? "k" : " kHz");
 	}
+}
+
+void appendForParamValue(FreqParam which, float paramValue, StringBuf& buf, bool compact) {
+	Unit unit;
+	float value = computeValue(which, paramValue, unit);
+	appendUnitValue(value, unit, buf, compact);
 }
 
 float menuValueToParamValue(int32_t menuValue) {
@@ -143,16 +305,19 @@ float menuValueToParamValue(int32_t menuValue) {
 } // namespace
 
 bool shouldShowHz(params::Kind kind, int32_t paramID) {
-	return runtimeFeatureSettings.isOn(RuntimeFeatureSettingType::FilterFrequencyDisplay)
-	       && identify(kind, paramID) != FreqParam::NONE;
+	if (!runtimeFeatureSettings.isOn(RuntimeFeatureSettingType::FilterFrequencyDisplay)) {
+		return false;
+	}
+	FreqParam which = identify(kind, paramID);
+	return which != FreqParam::NONE && isFreeRunning(which, kind, paramID);
 }
 
 void appendHzForMenuValue(params::Kind kind, int32_t paramID, int32_t menuValue, StringBuf& buf, bool compact) {
-	appendHz(identify(kind, paramID), menuValueToParamValue(menuValue), buf, compact);
+	appendForParamValue(identify(kind, paramID), menuValueToParamValue(menuValue), buf, compact);
 }
 
 void appendHzForKnobPos(params::Kind kind, int32_t paramID, int32_t knobPos, StringBuf& buf, bool compact) {
-	appendHz(identify(kind, paramID), (float)(knobPos - 64) * 33554432.0f, buf, compact);
+	appendForParamValue(identify(kind, paramID), (float)(knobPos - 64) * 33554432.0f, buf, compact);
 }
 
 void drawMenuHzLine(params::Kind kind, int32_t paramID, int32_t menuValue) {

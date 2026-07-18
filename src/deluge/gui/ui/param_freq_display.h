@@ -22,12 +22,15 @@
 
 #include <cstdint>
 
-// Display-only conversion of the filter/EQ cutoff params (stored and automated as 0-50 menu values
-// / 0-128 knob positions - nothing about storage changes) to their approximate frequency in Hz.
-// Gated behind the FilterFrequencyDisplay community feature.
+// Display-only conversion of params stored/automated as 0-50 menu values / 0-128 knob positions
+// (nothing about storage changes) to real-world units: filter and EQ cutoffs in Hz, free-running
+// LFO / mod-FX / arp rates in Hz, and envelope attack/decay/release stage lengths in ms/s.
+// Gated behind the FilterFrequencyDisplay community feature; tempo-synced LFO/arp rates are
+// suppressed (the Hz reading would be wrong).
 namespace deluge::gui::param_freq_display {
 
-// True when kind+paramID identify a filter or EQ frequency param AND the community flag is on.
+// True when kind+paramID identify a convertible param AND the community flag is on AND (for
+// LFO/arp rates) the thing is free-running.
 bool shouldShowHz(deluge::modulation::params::Kind kind, int32_t paramID);
 
 // Appends e.g. "310 Hz" / "1.8 kHz" for a 0-50 menu value. compact drops the unit: "310", "1.8k".
