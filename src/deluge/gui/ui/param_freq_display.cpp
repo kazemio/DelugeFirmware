@@ -26,8 +26,10 @@
 #include "model/mod_controllable/mod_controllable_audio.h"
 #include "model/settings/runtime_feature_settings.h"
 #include "model/song/song.h"
+#include "modulation/sidechain/sidechain.h"
 #include "processing/sound/sound.h"
 #include "util/functions.h"
+#include "util/lookuptables/lookuptables.h"
 
 #include <algorithm>
 #include <cmath>
@@ -67,6 +69,8 @@ enum class FreqParam {
 	ENV_ATTACK,
 	ENV_DECAY,
 	ENV_RELEASE,
+	DELAY_RATE_PATCHED,
+	DELAY_RATE_GLOBAL,
 };
 
 enum class Unit { HZ, SECONDS };
@@ -87,6 +91,8 @@ FreqParam identify(params::Kind kind, int32_t paramID) {
 			return FreqParam::MOD_FX_RATE;
 		case params::GLOBAL_ARP_RATE:
 			return FreqParam::ARP_RATE;
+		case params::GLOBAL_DELAY_RATE:
+			return FreqParam::DELAY_RATE_PATCHED;
 		default:
 			if (paramID >= params::LOCAL_ENV_0_ATTACK && paramID <= params::LOCAL_ENV_3_ATTACK) {
 				return FreqParam::ENV_ATTACK;
@@ -119,6 +125,8 @@ FreqParam identify(params::Kind kind, int32_t paramID) {
 				return FreqParam::MOD_FX_RATE;
 			case params::UNPATCHED_ARP_RATE:
 				return FreqParam::ARP_RATE;
+			case params::UNPATCHED_DELAY_RATE:
+				return FreqParam::DELAY_RATE_GLOBAL;
 			default:
 				break;
 			}
@@ -152,6 +160,12 @@ bool isFreeRunning(FreqParam which, params::Kind kind, int32_t paramID) {
 			break;
 		}
 		return sound->lfoConfig[lfoId].syncLevel == SYNC_LEVEL_NONE;
+	}
+	if (which == FreqParam::DELAY_RATE_PATCHED || which == FreqParam::DELAY_RATE_GLOBAL) {
+		// Delay time only reads truthfully while the delay is unsynced (it defaults to synced)
+		auto* modControllable =
+		    static_cast<ModControllableAudio*>(view.activeModControllableModelStack.modControllable);
+		return modControllable != nullptr && modControllable->delay.syncLevel == SYNC_LEVEL_NONE;
 	}
 	if (which == FreqParam::MOD_FX_RATE) {
 		// In GRAIN mode the rate feeds the granular engine, not a cyclic LFO, so a Hz sweep
@@ -222,6 +236,17 @@ float computeValue(FreqParam which, float paramValue, Unit& unit) {
 		adjustment = -paramValue * (536870912.0f * 1.5f / 4294967296.0f);
 		neutral = 4096.0f;
 		break;
+	case FreqParam::DELAY_RATE_PATCHED:
+	case FreqParam::DELAY_RATE_GLOBAL: {
+		// Tape delay: one loop = 16384 * 2^24 / rate samples, clamped to [1, 88200]
+		// (dsp/delay/delay_buffer.cpp getIdealBufferSizeFromRate); patched preset is scaled by
+		// paramRanges[GLOBAL_DELAY_RATE] = 2^29, unpatched by the >>2 shortcut
+		float factor = (which == FreqParam::DELAY_RATE_PATCHED) ? (536870912.0f / 4294967296.0f) : 0.25f;
+		float rate = std::min((float)kMaxSampleValue * std::exp2(paramValue * factor / 67108864.0f), 2147483647.0f);
+		float samples = std::clamp(274877906944.0f / rate, 1.0f, 88200.0f);
+		unit = Unit::SECONDS;
+		return samples / (float)kSampleRate;
+	}
 	case FreqParam::ENV_DECAY:
 	case FreqParam::ENV_RELEASE: {
 		// finalValue = neutral * lookupReleaseRate(adjustment) / 2^32 (the dumb envelope hack)
@@ -357,6 +382,38 @@ bool drawCompactHz(params::Kind kind, int32_t paramID, int32_t menuValue, int32_
 	deluge::hid::display::OLED::main.drawStringCentered(hzText.c_str(), startX, yPixel, kTextTitleSpacingX,
 	                                                    kTextTitleSizeY, width);
 	return true;
+}
+
+static float sidechainStageSeconds(bool isRelease, int32_t menuValue) {
+	int32_t index = std::clamp<int32_t>(menuValue, 0, 50);
+	// getParamFromUserValue: attack = attackRateTable[v]*4, release = releaseRateTable[v]*8;
+	// stages complete at 2^23 pos units (modulation/sidechain/sidechain.cpp render)
+	float rate = isRelease ? (float)releaseRateTable[index] * 8.0f : (float)attackRateTable[index] * 4.0f;
+	return kEnvelopeStageLength / (std::max(rate, 1.0f) * (float)kSampleRate);
+}
+
+static bool sidechainShowsTime(SideChain& sidechain) {
+	return runtimeFeatureSettings.isOn(RuntimeFeatureSettingType::ShowRealUnits)
+	       && sidechain.syncLevel == SYNC_LEVEL_NONE;
+}
+
+void drawMenuSidechainTimeLine(SideChain& sidechain, bool isRelease, int32_t menuValue) {
+	if (!sidechainShowsTime(sidechain)) {
+		return;
+	}
+	DEF_STACK_STRING_BUF(text, 12);
+	appendUnitValue(sidechainStageSeconds(isRelease, menuValue), Unit::SECONDS, text, Style::FULL);
+	// The sidechain menus use the plain huge-digits layout (no bar): digits end at y=38
+	deluge::hid::display::OLED::main.drawStringCentred(text.c_str(), 40 + OLED_MAIN_TOPMOST_PIXEL, kTextSpacingX,
+	                                                   kTextSizeYUpdated);
+}
+
+void appendSidechainTimeSuffix(SideChain& sidechain, bool isRelease, int32_t menuValue, StringBuf& buf) {
+	if (!sidechainShowsTime(sidechain)) {
+		return;
+	}
+	buf.append(' ');
+	appendUnitValue(sidechainStageSeconds(isRelease, menuValue), Unit::SECONDS, buf, Style::SHORT);
 }
 
 } // namespace deluge::gui::param_freq_display

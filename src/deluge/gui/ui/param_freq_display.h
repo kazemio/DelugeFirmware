@@ -22,6 +22,8 @@
 
 #include <cstdint>
 
+class SideChain;
+
 // Display-only conversion of params stored/automated as 0-50 menu values / 0-128 knob positions
 // (nothing about storage changes) to real-world units: filter and EQ cutoffs in Hz, free-running
 // LFO / mod-FX / arp rates in Hz, and envelope attack/decay/release stage lengths in ms/s.
@@ -47,10 +49,16 @@ void appendHzForMenuValue(deluge::modulation::params::Kind kind, int32_t paramID
 void appendHzForKnobPos(deluge::modulation::params::Kind kind, int32_t paramID, int32_t knobPos, StringBuf& buf,
                         Style style = Style::FULL);
 
-// Appends " (310Hz)" after an already-written value if the param converts; no-op otherwise. For
-// one-line value notifications (horizontal menu banner).
+// Appends " 310Hz" after an already-written value if the param converts; no-op otherwise. For
+// one-line value notifications (horizontal menu banner) and the automation view readout.
 void appendShortSuffixForMenuValue(deluge::modulation::params::Kind kind, int32_t paramID, int32_t menuValue,
                                    StringBuf& buf);
+
+// Ducking-sidechain attack/release menus (their 0-50 indexes attackRateTable/releaseRateTable
+// directly - they're not Kind/paramID params). Draws/appends the stage time; no-op when the flag
+// is off or the sidechain is tempo-synced.
+void drawMenuSidechainTimeLine(::SideChain& sidechain, bool isRelease, int32_t menuValue);
+void appendSidechainTimeSuffix(::SideChain& sidechain, bool isRelease, int32_t menuValue, StringBuf& buf);
 
 // Draws the Hz reading as a small centred line under the big value of a full-screen OLED menu.
 // No-op when the flag is off or the param has no Hz meaning.
