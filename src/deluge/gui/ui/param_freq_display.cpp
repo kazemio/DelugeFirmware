@@ -23,6 +23,7 @@
 #include "model/clip/instrument_clip.h"
 #include "model/drum/drum.h"
 #include "model/instrument/kit.h"
+#include "model/mod_controllable/mod_controllable_audio.h"
 #include "model/settings/runtime_feature_settings.h"
 #include "model/song/song.h"
 #include "processing/sound/sound.h"
@@ -151,6 +152,13 @@ bool isFreeRunning(FreqParam which, params::Kind kind, int32_t paramID) {
 			break;
 		}
 		return sound->lfoConfig[lfoId].syncLevel == SYNC_LEVEL_NONE;
+	}
+	if (which == FreqParam::MOD_FX_RATE) {
+		// In GRAIN mode the rate feeds the granular engine, not a cyclic LFO, so a Hz sweep
+		// reading would be meaningless. All mod controllables are ModControllableAudio.
+		auto* modControllable =
+		    static_cast<ModControllableAudio*>(view.activeModControllableModelStack.modControllable);
+		return modControllable != nullptr && modControllable->modFXType_ != ModFXType::GRAIN;
 	}
 	if (which == FreqParam::ARP_RATE) {
 		Clip* clip = getCurrentClip();
