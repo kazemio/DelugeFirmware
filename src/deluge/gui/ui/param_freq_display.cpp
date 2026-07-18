@@ -247,55 +247,55 @@ float computeValue(FreqParam which, float paramValue, Unit& unit) {
 	}
 }
 
-void appendUnitValue(float value, Unit unit, StringBuf& buf, bool compact) {
+void appendUnitValue(float value, Unit unit, StringBuf& buf, Style style) {
 	if (unit == Unit::SECONDS) {
+		char const* msSuffix = (style == Style::FULL) ? " ms" : "ms";
+		char const* sSuffix = (style == Style::FULL) ? " s" : "s";
 		if (value < 0.0095f) {
 			buf.appendFloat(value * 1000.0f, 1, 1);
-			buf.append(" ms");
+			buf.append(msSuffix);
 		}
 		else if (value < 0.9995f) {
 			buf.appendInt((int32_t)(value * 1000.0f + 0.5f));
-			buf.append(" ms");
+			buf.append(msSuffix);
 		}
 		else if (value < 9.95f) {
 			buf.appendFloat(value, 1, 1);
-			buf.append(" s");
+			buf.append(sSuffix);
 		}
 		else {
 			buf.appendInt((int32_t)(value + 0.5f));
-			buf.append(" s");
+			buf.append(sSuffix);
 		}
 		return;
 	}
+	char const* hzSuffix = (style == Style::FULL) ? " Hz" : (style == Style::SHORT) ? "Hz" : "";
+	char const* khzSuffix = (style == Style::FULL) ? " kHz" : "k";
 	if (value < 9.995f) {
 		buf.appendFloat(value, 1, 2);
-		if (!compact) {
-			buf.append(" Hz");
-		}
+		buf.append(hzSuffix);
 	}
 	else if (value < 999.5f) {
 		buf.appendInt((int32_t)(value + 0.5f));
-		if (!compact) {
-			buf.append(" Hz");
-		}
+		buf.append(hzSuffix);
 	}
 	else if (value < 9950.0f) {
 		int32_t tenthsOfKhz = (int32_t)(value / 100.0f + 0.5f);
 		buf.appendInt(tenthsOfKhz / 10);
 		buf.append('.');
 		buf.appendInt(tenthsOfKhz % 10);
-		buf.append(compact ? "k" : " kHz");
+		buf.append(khzSuffix);
 	}
 	else {
 		buf.appendInt((int32_t)(value / 1000.0f + 0.5f));
-		buf.append(compact ? "k" : " kHz");
+		buf.append(khzSuffix);
 	}
 }
 
-void appendForParamValue(FreqParam which, float paramValue, StringBuf& buf, bool compact) {
+void appendForParamValue(FreqParam which, float paramValue, StringBuf& buf, Style style) {
 	Unit unit;
 	float value = computeValue(which, paramValue, unit);
-	appendUnitValue(value, unit, buf, compact);
+	appendUnitValue(value, unit, buf, style);
 }
 
 float menuValueToParamValue(int32_t menuValue) {
@@ -312,12 +312,21 @@ bool shouldShowHz(params::Kind kind, int32_t paramID) {
 	return which != FreqParam::NONE && isFreeRunning(which, kind, paramID);
 }
 
-void appendHzForMenuValue(params::Kind kind, int32_t paramID, int32_t menuValue, StringBuf& buf, bool compact) {
-	appendForParamValue(identify(kind, paramID), menuValueToParamValue(menuValue), buf, compact);
+void appendHzForMenuValue(params::Kind kind, int32_t paramID, int32_t menuValue, StringBuf& buf, Style style) {
+	appendForParamValue(identify(kind, paramID), menuValueToParamValue(menuValue), buf, style);
 }
 
-void appendHzForKnobPos(params::Kind kind, int32_t paramID, int32_t knobPos, StringBuf& buf, bool compact) {
-	appendForParamValue(identify(kind, paramID), (float)(knobPos - 64) * 33554432.0f, buf, compact);
+void appendHzForKnobPos(params::Kind kind, int32_t paramID, int32_t knobPos, StringBuf& buf, Style style) {
+	appendForParamValue(identify(kind, paramID), (float)(knobPos - 64) * 33554432.0f, buf, style);
+}
+
+void appendShortSuffixForMenuValue(params::Kind kind, int32_t paramID, int32_t menuValue, StringBuf& buf) {
+	if (!shouldShowHz(kind, paramID)) {
+		return;
+	}
+	buf.append(" (");
+	appendHzForMenuValue(kind, paramID, menuValue, buf, Style::SHORT);
+	buf.append(")");
 }
 
 void drawMenuHzLine(params::Kind kind, int32_t paramID, int32_t menuValue) {
@@ -337,7 +346,7 @@ bool drawCompactHz(params::Kind kind, int32_t paramID, int32_t menuValue, int32_
 		return false;
 	}
 	DEF_STACK_STRING_BUF(hzText, 8);
-	appendHzForMenuValue(kind, paramID, menuValue, hzText, true);
+	appendHzForMenuValue(kind, paramID, menuValue, hzText, Style::COMPACT);
 	deluge::hid::display::OLED::main.drawStringCentered(hzText.c_str(), startX, yPixel, kTextTitleSpacingX,
 	                                                    kTextTitleSizeY, width);
 	return true;

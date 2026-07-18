@@ -46,6 +46,12 @@ public:
 		IntegerContinuous::drawPixelsForOled();
 		param_freq_display::drawMenuHzLine(getParamKind(), getP(), this->getValue());
 	}
+
+	// Same reading appended to the horizontal-menu value banner, e.g. "35 (2.7k)"
+	void getNotificationValue(StringBuf& value) override {
+		IntegerContinuous::getNotificationValue(value);
+		param_freq_display::appendShortSuffixForMenuValue(getParamKind(), getP(), this->getValue(), value);
+	}
 	ParamDescriptor getLearningThing() final;
 	[[nodiscard]] int32_t getMaxValue() const override { return Param::getMaxValue(); }
 	[[nodiscard]] int32_t getMinValue() const override { return Param::getMinValue(); }

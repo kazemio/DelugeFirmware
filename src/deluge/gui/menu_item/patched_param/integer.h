@@ -40,6 +40,12 @@ public:
 		param_freq_display::drawMenuHzLine(getParamKind(), getP(), this->getValue());
 	}
 
+	// Same reading appended to the horizontal-menu value banner, e.g. "35 (2.7k)"
+	void getNotificationValue(StringBuf& value) override {
+		IntegerContinuous::getNotificationValue(value);
+		param_freq_display::appendShortSuffixForMenuValue(getParamKind(), getP(), this->getValue(), value);
+	}
+
 	bool usesAffectEntire() override { return true; }
 
 	ParamDescriptor getLearningThing() final { return PatchedParam::getLearningThing(); }

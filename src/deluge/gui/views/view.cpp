@@ -1238,7 +1238,8 @@ void View::displayModEncoderValuePopup(params::Kind kind, int32_t paramID, int32
 		parameter_value.appendInt(current_display_value);
 		if (param_freq_display::shouldShowHz(kind, paramID)) {
 			parameter_value.append(" (");
-			param_freq_display::appendHzForKnobPos(kind, paramID, newKnobPos + kKnobPosOffset, parameter_value);
+			param_freq_display::appendHzForKnobPos(kind, paramID, newKnobPos + kKnobPosOffset, parameter_value,
+			                                       param_freq_display::Style::SHORT);
 			parameter_value.append(")");
 		}
 	}
