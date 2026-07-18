@@ -203,6 +203,11 @@ void RuntimeFeatureSettings::init() {
 	// macro
 	SetupOnOffSetting(settings[RuntimeFeatureSettingType::MacroSystem], STRING_FOR_COMMUNITY_FEATURE_MACROS, "macros",
 	                  RuntimeFeatureStateToggle::Off);
+
+	// Filter Frequency Display
+	SetupOnOffSetting(settings[RuntimeFeatureSettingType::FilterFrequencyDisplay],
+	                  STRING_FOR_COMMUNITY_FEATURE_FILTER_FREQUENCY_DISPLAY, "filterFrequencyDisplay",
+	                  RuntimeFeatureStateToggle::Off);
 }
 
 void RuntimeFeatureSettings::readSettingsFromFile() {

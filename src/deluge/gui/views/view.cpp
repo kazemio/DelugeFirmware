@@ -29,6 +29,7 @@
 #include "gui/ui/keyboard/keyboard_screen.h"
 #include "gui/ui/load/load_instrument_preset_ui.h"
 #include "gui/ui/load/load_song_ui.h"
+#include "gui/ui/param_freq_display.h"
 #include "gui/ui/root_ui.h"
 #include "gui/ui/save/save_song_ui.h"
 #include "gui/ui/sound_editor.h"
@@ -1235,6 +1236,11 @@ void View::displayModEncoderValuePopup(params::Kind kind, int32_t paramID, int32
 	else {
 		current_display_value = calculateKnobPosForDisplay(kind, paramID, newKnobPos + kKnobPosOffset);
 		parameter_value.appendInt(current_display_value);
+		if (param_freq_display::shouldShowHz(kind, paramID)) {
+			parameter_value.append(" (");
+			param_freq_display::appendHzForKnobPos(kind, paramID, newKnobPos + kKnobPosOffset, parameter_value);
+			parameter_value.append(")");
+		}
 	}
 
 	// Check if we need to update the notification (avoid excessive updates)
