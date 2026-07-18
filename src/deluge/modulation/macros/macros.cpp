@@ -19,6 +19,7 @@
 #include "definitions_cxx.hpp"
 #include "gui/l10n/l10n.h"
 #include "gui/ui/load/load_song_ui.h"
+#include "gui/ui/param_freq_display.h"
 #include "gui/ui/ui.h"
 #include "gui/views/automation_view.h"
 #include "gui/views/view.h"
@@ -243,6 +244,12 @@ static void appendTargetEndpoint(StringBuf& buf, Output* instrument, uint16_t de
 	params::Kind kind;
 	int32_t paramID;
 	decodeDestination(domainForOutput(instrument), destination, &kind, &paramID);
+	// Filter/EQ cutoff targets read in Hz when the FilterFrequencyDisplay community feature is on,
+	// e.g. "310 Hz - 5.5 kHz" instead of "22 - 35"
+	if (gui::param_freq_display::shouldShowHz(kind, paramID)) {
+		gui::param_freq_display::appendHzForKnobPos(kind, paramID, endpoint, buf);
+		return;
+	}
 	buf.appendInt(view.calculateKnobPosForDisplay(kind, paramID, endpoint));
 }
 
