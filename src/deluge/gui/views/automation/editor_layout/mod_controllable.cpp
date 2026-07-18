@@ -16,6 +16,7 @@
  */
 
 #include "gui/views/automation/editor_layout/mod_controllable.h"
+#include "gui/ui/param_freq_display.h"
 #include "gui/views/instrument_clip_view.h"
 #include "gui/views/view.h"
 #include "hid/display/display.h"
@@ -311,9 +312,18 @@ void AutomationEditorLayoutModControllable::renderAutomationEditorDisplayOLED(
 		canvas.drawStringAlignRight(bufferRight, yPos, kTextSpacingX, kTextSpacingY);
 	}
 	else {
-		char buffer[5];
-		intToString(knobPosLeft, buffer);
-		canvas.drawStringCentred(buffer, yPos, kTextSpacingX, kTextSpacingY);
+		// Convertible params (filter/EQ cutoffs, rates, envelope times) get their real-world
+		// reading appended when the ShowRealUnits community feature is on, e.g. "35 2.7k"
+		params::Kind lastSelectedParamKind =
+		    getOnArrangerView() ? currentSong->lastSelectedParamKind : clip->lastSelectedParamKind;
+		int32_t lastSelectedParamID =
+		    getOnArrangerView() ? currentSong->lastSelectedParamID : clip->lastSelectedParamID;
+
+		DEF_STACK_STRING_BUF(valueBuf, 16);
+		valueBuf.appendInt(knobPosLeft);
+		param_freq_display::appendShortSuffixForMenuValue(lastSelectedParamKind, lastSelectedParamID, knobPosLeft,
+		                                                  valueBuf);
+		canvas.drawStringCentred(valueBuf.c_str(), yPos, kTextSpacingX, kTextSpacingY);
 	}
 }
 
