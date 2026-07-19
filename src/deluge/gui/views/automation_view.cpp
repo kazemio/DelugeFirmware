@@ -1502,7 +1502,9 @@ bool AutomationView::handleHorizontalEncoderButtonAction(bool on, bool isAudioCl
 	else if (onArrangerView) {
 		return true;
 	}
-	else if (isAudioClip) {
+	// (FX clips fall through to the multiply branch below - they have no sample to timestretch, and
+	// their increaseLengthWithRepeats override makes doubleClipLengthAction repeat the automation)
+	else if (isAudioClip && getCurrentClip()->type == ClipType::AUDIO) {
 		// removing time stretching by re-calculating clip length based on length of audio sample
 		if (on && Buttons::isButtonPressed(deluge::hid::button::Y_ENC) && currentUIMode == UI_MODE_NONE
 		    && getCurrentClip()->type == ClipType::AUDIO) {

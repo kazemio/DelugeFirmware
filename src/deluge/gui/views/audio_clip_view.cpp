@@ -26,6 +26,7 @@
 #include "gui/ui_timer_manager.h"
 #include "gui/views/arranger_view.h"
 #include "gui/views/automation_view.h"
+#include "gui/views/instrument_clip_view.h"
 #include "gui/views/session_view.h"
 #include "gui/views/view.h"
 #include "gui/waveform/waveform_renderer.h"
@@ -388,6 +389,24 @@ dontDeactivateMarker:
 	}
 
 	else if (b == X_ENC) {
+		// FX clip: no sample, so shift + encoder press "multiplies" the clip like on instrument
+		// clips - doubles the length and repeats the automation into the new half
+		if (getCurrentClip()->type == ClipType::FX) {
+			if (on && Buttons::isShiftButtonPressed() && currentUIMode == UI_MODE_NONE) {
+				if (inCardRoutine) {
+					return ActionResult::REMIND_ME_OUTSIDE_CARD_ROUTINE;
+				}
+				// Zoom to max if we weren't already there...
+				if (!zoomToMax()) {
+					// Or if we didn't need to do that, double Clip length
+					instrumentClipView.doubleClipLengthAction();
+				}
+				else {
+					displayZoomLevel();
+				}
+			}
+			goto dontDeactivateMarker; // no sample marker to worry about
+		}
 		// removing time stretching by re-calculating clip length based on length of audio sample
 		if (Buttons::isButtonPressed(deluge::hid::button::Y_ENC)) {
 			if (on && currentUIMode == UI_MODE_NONE) {
