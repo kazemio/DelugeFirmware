@@ -3655,7 +3655,7 @@ FXClip* SessionView::gridCreateFXClipWithNewTrack() {
 	// clip's cell, where it's invisible - so refuse with a popup instead. More FX clips can still
 	// be created with the normal gesture in the FX track's own column.
 	if (currentSong->getFXOutput() != nullptr) {
-		display->displayPopup(display->haveOLED() ? "FX track already exists" : "CANT");
+		display->displayPopup(l10n::get(l10n::String::STRING_FOR_FX_TRACK_ALREADY_EXISTS));
 		return nullptr;
 	}
 
