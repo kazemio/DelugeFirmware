@@ -303,7 +303,7 @@ void appendUnitValue(float value, Unit unit, StringBuf& buf, Style style) {
 		return;
 	}
 	char const* hzSuffix = (style == Style::FULL) ? " Hz" : (style == Style::SHORT) ? "Hz" : "";
-	char const* khzSuffix = (style == Style::FULL) ? " kHz" : "k";
+	char const* khzSuffix = (style == Style::FULL) ? " kHz" : (style == Style::SHORT) ? "kHz" : "k";
 	if (value < 9.995f) {
 		buf.appendFloat(value, 1, 2);
 		buf.append(hzSuffix);
