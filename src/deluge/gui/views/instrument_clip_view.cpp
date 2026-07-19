@@ -7356,10 +7356,12 @@ bool InstrumentClipView::renderMainPads(uint32_t whichRows, RGB image[][kDisplay
 		return true;
 	}
 
-	// A totally empty clip spells its type across the pads until the first note lands
+	// A totally empty clip spells its type across the pads until the first note lands. Held off
+	// until boot settles, else the blank boot song's default synth clip flashes "SYNTH" before
+	// the startup song loads.
 	char const* splashWord = nullptr;
 	RGB splashColour = colours::black;
-	if (!getCurrentInstrumentClip()->containsAnyNotes()) {
+	if (clipTypeSplashBootSettled() && !getCurrentInstrumentClip()->containsAnyNotes()) {
 		switch (getCurrentOutputType()) {
 		case OutputType::SYNTH:
 			splashWord = "SYNTH";

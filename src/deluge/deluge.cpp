@@ -33,6 +33,7 @@
 #include "gui/views/arranger_view.h"
 #include "gui/views/audio_clip_view.h"
 #include "gui/views/automation_view.h"
+#include "gui/views/clip_type_splash.h"
 #include "gui/views/instrument_clip_view.h"
 #include "gui/views/session_view.h"
 #include "gui/views/view.h"
@@ -486,6 +487,13 @@ void setupStartupSong() {
 	}
 }
 
+// Whatever setupStartupSong did (loaded a song, fell back, or blank mode's immediate return),
+// boot has settled - the empty-clip type splash may show from here on.
+void setupStartupSongThenSettleSplash() {
+	setupStartupSong();
+	clipTypeSplashSetBootSettled();
+}
+
 void setupOLED() {
 	// delayMS(10);
 
@@ -823,7 +831,8 @@ extern "C" int32_t deluge_main(void) {
 	midiFollow.readDefaultsFromFile();
 	PadLEDs::setBrightnessLevel(FlashStorage::defaultPadBrightness);
 	setupBlankSong(); // we always need to do this
-	addConditionalTask(setupStartupSong, 100, isCardReady, "load startup song", RESOURCE_SD | RESOURCE_SD_ROUTINE);
+	addConditionalTask(setupStartupSongThenSettleSplash, 100, isCardReady, "load startup song",
+	                   RESOURCE_SD | RESOURCE_SD_ROUTINE);
 
 #ifdef TEST_VECTOR
 	NoteVector noteVector;

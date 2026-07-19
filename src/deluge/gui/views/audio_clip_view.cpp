@@ -127,7 +127,7 @@ bool AudioClipView::renderMainPads(uint32_t whichRows, RGB image[][kDisplayWidth
 		Clip* clip = getCurrentClip();
 		char const* word = nullptr;
 		RGB colour = colours::black;
-		if (clip) {
+		if (clip && clipTypeSplashBootSettled()) {
 			if (clip->type == ClipType::FX) {
 				if (clip->isEmpty(false)) {
 					word = "FX";

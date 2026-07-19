@@ -105,6 +105,18 @@ void drawMiniLine(char const* letters, size_t length, int32_t topY, RGB colour, 
 
 } // namespace
 
+namespace {
+bool bootSettled = false;
+} // namespace
+
+void clipTypeSplashSetBootSettled() {
+	bootSettled = true;
+}
+
+bool clipTypeSplashBootSettled() {
+	return bootSettled;
+}
+
 bool clipTypeSplashStateChanged(bool splashShowing) {
 	if (splashShowing != splashWasShowing) {
 		splashWasShowing = splashShowing;

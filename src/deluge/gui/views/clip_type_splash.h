@@ -35,6 +35,12 @@ void renderClipTypeSplash(char const* word, RGB colour, uint32_t whichRows, RGB 
 // repaint all rows and drop any render caches.
 bool clipTypeSplashStateChanged(bool splashShowing);
 
+// Boot gate: the blank boot song's default synth clip renders before any startup song replaces
+// it, which made "SYNTH" flash at power-on. The splash stays off until this is called once boot
+// has settled (after the startup-song task resolves, including its do-nothing blank mode).
+void clipTypeSplashSetBootSettled();
+bool clipTypeSplashBootSettled();
+
 // True when the last live-pad render by a clip view drew the splash word. Only meaningful while
 // the current UI is instrumentClipView or audioClipView (other views don't update the state).
 // Transitions leaving the clip use this to start their collapse/fade animation from black
