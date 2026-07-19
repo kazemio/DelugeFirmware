@@ -3660,6 +3660,15 @@ AudioClip* SessionView::gridCreateAudioClipWithNewTrack() {
 }
 
 FXClip* SessionView::gridCreateFXClipWithNewTrack() {
+	// Only one master FX track per song. Creating "FX" via the new-track gesture while one exists
+	// would silently drop the clip into the existing FX column - potentially on top of another
+	// clip's cell, where it's invisible - so refuse with a popup instead. More FX clips can still
+	// be created with the normal gesture in the FX track's own column.
+	if (currentSong->getFXOutput() != nullptr) {
+		display->displayPopup(display->haveOLED() ? "FX track already exists" : "CANT");
+		return nullptr;
+	}
+
 	// Allocate new clip
 	void* memory = GeneralMemoryAllocator::get().allocMaxSpeed(sizeof(FXClip));
 	if (!memory) {
