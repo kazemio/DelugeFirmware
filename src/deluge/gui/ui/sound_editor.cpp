@@ -46,6 +46,7 @@
 #include "model/note/note_row.h"
 #include "model/settings/runtime_feature_settings.h"
 #include "model/song/song.h"
+#include "modulation/macros/macros.h"
 #include "processing/engines/audio_engine.h"
 #include "processing/sound/sound_drum.h"
 #include "processing/sound/sound_instrument.h"
@@ -1562,6 +1563,11 @@ bool SoundEditor::midiCCReceived(MIDICable& cable, uint8_t channel, uint8_t ccNu
 		return true;
 	}
 
+	// Let the focused menu item follow this CC live (e.g. macro From/To dials track the dest knob).
+	if (getCurrentMenuItem()->liveEditFromMidiCC(ccNumber, value)) {
+		return true;
+	}
+
 	return false;
 }
 
@@ -1747,6 +1753,12 @@ doMIDIOrCV:
 				else {
 					newItem = &soundEditorRootMenu;
 				}
+			}
+
+			else if (clip->type == ClipType::FX) {
+				// FX clips edit the song master FX chain, so they get the song FX surface -
+				// plus the Macros menu (an FXOutput hosts GLOBAL macros like an audio clip)
+				newItem = &soundEditorRootMenuFXClip;
 			}
 
 			else {

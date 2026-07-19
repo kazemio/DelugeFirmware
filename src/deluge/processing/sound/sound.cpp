@@ -137,6 +137,12 @@ void Sound::initParams(ParamManager* paramManager) {
 
 	unpatchedParams->params[params::UNPATCHED_PORTAMENTO].setCurrentValueBasicForSetup(-2147483648);
 
+	// macro lanes rest at 0 (source at rest) until the macro system writes them
+	unpatchedParams->params[params::UNPATCHED_MACRO_1].setCurrentValueBasicForSetup(-2147483648);
+	unpatchedParams->params[params::UNPATCHED_MACRO_2].setCurrentValueBasicForSetup(-2147483648);
+	unpatchedParams->params[params::UNPATCHED_MACRO_3].setCurrentValueBasicForSetup(-2147483648);
+	unpatchedParams->params[params::UNPATCHED_MACRO_4].setCurrentValueBasicForSetup(-2147483648);
+
 	PatchedParamSet* patchedParams = paramManager->getPatchedParamSet();
 	patchedParams->params[params::LOCAL_VOLUME].setCurrentValueBasicForSetup(0);
 	patchedParams->params[params::LOCAL_OSC_A_VOLUME].setCurrentValueBasicForSetup(2147483647);
@@ -1265,6 +1271,14 @@ Error Sound::readTagFromFileOrError(Deserializer& reader, char const* tagName, P
 		reader.exitTag("reverbAmount");
 	}
 
+	// Legacy saturation amount, from before it was a param
+	else if (!strcmp(tagName, "clippingAmount")) {
+		ENSURE_PARAM_MANAGER_EXISTS
+		unpatchedParams->params[params::UNPATCHED_SATURATION].setCurrentValueBasicForSetup(
+		    saturationParamValueFromLegacyClipping(reader.readTagOrAttributeValueInt()));
+		reader.exitTag("clippingAmount");
+	}
+
 	else if (!strcmp(tagName, "defaultParams")) {
 		ENSURE_PARAM_MANAGER_EXISTS
 		Sound::readParamsFromFile(reader, paramManager, readAutomationUpToPos);
@@ -2379,6 +2393,9 @@ void Sound::render(ModelStackWithThreeMainThings* modelStack, std::span<StereoSa
 	}
 
 	ParamManagerForTimeline* paramManager = (ParamManagerForTimeline*)modelStack->paramManager;
+
+	// Refresh the saturation amount the voices will render with, so automation takes effect
+	updateSaturationAmountFromParam(paramManager);
 
 	// Do global LFO
 	if (paramManager->getPatchCableSet()->isSourcePatchedToSomething(PatchSource::LFO_GLOBAL_1)) {
@@ -3753,6 +3770,22 @@ bool Sound::readParamTagFromFile(Deserializer& reader, char const* tagName, Para
 		unpatchedParams->readParam(reader, unpatchedParamsSummary, params::UNPATCHED_PORTAMENTO, readAutomationUpToPos);
 		reader.exitTag("portamento");
 	}
+	else if (!strcmp(tagName, "macro1")) {
+		unpatchedParams->readParam(reader, unpatchedParamsSummary, params::UNPATCHED_MACRO_1, readAutomationUpToPos);
+		reader.exitTag("macro1");
+	}
+	else if (!strcmp(tagName, "macro2")) {
+		unpatchedParams->readParam(reader, unpatchedParamsSummary, params::UNPATCHED_MACRO_2, readAutomationUpToPos);
+		reader.exitTag("macro2");
+	}
+	else if (!strcmp(tagName, "macro3")) {
+		unpatchedParams->readParam(reader, unpatchedParamsSummary, params::UNPATCHED_MACRO_3, readAutomationUpToPos);
+		reader.exitTag("macro3");
+	}
+	else if (!strcmp(tagName, "macro4")) {
+		unpatchedParams->readParam(reader, unpatchedParamsSummary, params::UNPATCHED_MACRO_4, readAutomationUpToPos);
+		reader.exitTag("macro4");
+	}
 	else if (!strcmp(tagName, "compressorShape")) {
 		unpatchedParams->readParam(reader, unpatchedParamsSummary, params::UNPATCHED_SIDECHAIN_SHAPE,
 		                           readAutomationUpToPos);
@@ -4035,6 +4068,10 @@ void Sound::writeParamsToFile(Serializer& writer, ParamManager* paramManager, bo
 	UnpatchedParamSet* unpatchedParams = paramManager->getUnpatchedParamSet();
 
 	unpatchedParams->writeParamAsAttribute(writer, "portamento", params::UNPATCHED_PORTAMENTO, writeAutomation);
+	unpatchedParams->writeParamAsAttribute(writer, "macro1", params::UNPATCHED_MACRO_1, writeAutomation);
+	unpatchedParams->writeParamAsAttribute(writer, "macro2", params::UNPATCHED_MACRO_2, writeAutomation);
+	unpatchedParams->writeParamAsAttribute(writer, "macro3", params::UNPATCHED_MACRO_3, writeAutomation);
+	unpatchedParams->writeParamAsAttribute(writer, "macro4", params::UNPATCHED_MACRO_4, writeAutomation);
 	unpatchedParams->writeParamAsAttribute(writer, "compressorShape", params::UNPATCHED_SIDECHAIN_SHAPE,
 	                                       writeAutomation);
 
