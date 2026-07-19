@@ -244,12 +244,6 @@ static void appendTargetEndpoint(StringBuf& buf, Output* instrument, uint16_t de
 	params::Kind kind;
 	int32_t paramID;
 	decodeDestination(domainForOutput(instrument), destination, &kind, &paramID);
-	// Filter/EQ cutoff targets read in Hz when the FilterFrequencyDisplay community feature is on,
-	// e.g. "310 Hz - 5.5 kHz" instead of "22 - 35"
-	if (gui::param_freq_display::shouldShowHz(kind, paramID)) {
-		gui::param_freq_display::appendHzForKnobPos(kind, paramID, endpoint, buf);
-		return;
-	}
 	buf.appendInt(view.calculateKnobPosForDisplay(kind, paramID, endpoint));
 }
 
@@ -262,15 +256,15 @@ void showTargetKnobIndicators(Output* instrument, int32_t macroIndex, int32_t ta
 // Forward-declared: defined with the cable helpers below.
 static bool cableExists(Clip* clip, uint16_t destination);
 
-// Whether this target's endpoints render as unit readings (Hz/ms) rather than plain numbers
-static bool targetEndpointsShowUnits(Output* instrument, uint16_t destination) {
+// Whether this target's range readout gets a real-units line (Hz/ms/dB) under the plain numbers;
+// on true, kindOut/paramIDOut identify the param for the conversion
+static bool targetEndpointsShowUnits(Output* instrument, uint16_t destination, params::Kind* kindOut,
+                                     int32_t* paramIDOut) {
 	if (!isDomainInternal(domainForOutput(instrument)) || isCableDestination(destination)) {
 		return false;
 	}
-	params::Kind kind;
-	int32_t paramID;
-	decodeDestination(domainForOutput(instrument), destination, &kind, &paramID);
-	return gui::param_freq_display::shouldShowHz(kind, paramID);
+	decodeDestination(domainForOutput(instrument), destination, kindOut, paramIDOut);
+	return gui::param_freq_display::shouldShowHz(*kindOut, *paramIDOut);
 }
 
 void showTargetRangeReadout(Output* instrument, int32_t macroIndex, int32_t target, uint16_t destination,
@@ -295,7 +289,7 @@ void showTargetRangeReadout(Output* instrument, int32_t macroIndex, int32_t targ
 		return;
 	}
 	MacroTargetSlot& f = instrument->macros[macroIndex].targets[target];
-	DEF_STACK_STRING_BUF(popup, 48);
+	DEF_STACK_STRING_BUF(popup, 64); // name + knob-number range + padded real-units line
 	if (destination == kNoDestination) {
 		popup.append("Target Assign");
 	}
@@ -303,25 +297,33 @@ void showTargetRangeReadout(Output* instrument, int32_t macroIndex, int32_t targ
 		appendTargetName(popup, instrument, target, destination);
 		popup.append(display->haveOLED() ? '\n' : ' ');
 
-		// Unit readings vary in width ("20 Hz" ... "1.6 kHz"), which would make the popup box
-		// resize while an endpoint is dialled. Pad them into fixed-width fields (sized for the
-		// widest possible reading) so the box keeps one size and only the digits move.
-		constexpr int32_t kUnitFieldWidth = 8; // widest reading: "20.2 kHz"
-		DEF_STACK_STRING_BUF(fromField, 12);
-		appendTargetEndpoint(fromField, instrument, destination, f.from);
-		DEF_STACK_STRING_BUF(toField, 12);
-		appendTargetEndpoint(toField, instrument, destination, f.to);
-		bool padFields = targetEndpointsShowUnits(instrument, destination);
+		// The range in the destination's own knob numbers always shows, so the familiar Deluge
+		// units stay visible even when a real-units line is added underneath
+		appendTargetEndpoint(popup, instrument, destination, f.from);
+		popup.append(" - ");
+		appendTargetEndpoint(popup, instrument, destination, f.to);
 
-		if (padFields) {
+		// Filter/EQ/rate/envelope targets get a third line in real units when the ShowRealUnits
+		// community feature is on, e.g. "310 Hz - 5.5 kHz" under "22 - 35"
+		params::Kind kind;
+		int32_t paramID;
+		if (display->haveOLED() && targetEndpointsShowUnits(instrument, destination, &kind, &paramID)) {
+			popup.append('\n');
+			// Unit readings vary in width ("20 Hz" ... "1.6 kHz"), which would make the popup box
+			// resize while an endpoint is dialled. Pad them into fixed-width fields (sized for the
+			// widest possible reading) so the box keeps one size and only the digits move.
+			constexpr int32_t kUnitFieldWidth = 8; // widest readings: "20.2 kHz", "-55.9 dB"
+			DEF_STACK_STRING_BUF(fromField, 12);
+			gui::param_freq_display::appendHzForKnobPos(kind, paramID, f.from, fromField);
+			DEF_STACK_STRING_BUF(toField, 12);
+			gui::param_freq_display::appendHzForKnobPos(kind, paramID, f.to, toField);
+
 			for (int32_t i = fromField.size(); i < kUnitFieldWidth; i++) {
 				popup.append(' ');
 			}
-		}
-		popup.append(fromField.c_str());
-		popup.append(" - ");
-		popup.append(toField.c_str());
-		if (padFields) {
+			popup.append(fromField.c_str());
+			popup.append(" - ");
+			popup.append(toField.c_str());
 			for (int32_t i = toField.size(); i < kUnitFieldWidth; i++) {
 				popup.append(' ');
 			}
