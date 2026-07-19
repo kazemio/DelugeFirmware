@@ -63,6 +63,7 @@ enum class FreqParam {
 	HPF_GLOBAL,
 	BASS,
 	TREBLE,
+	EQ_GAIN,
 	LFO_RATE,
 	MOD_FX_RATE,
 	ARP_RATE,
@@ -73,7 +74,7 @@ enum class FreqParam {
 	DELAY_RATE_GLOBAL,
 };
 
-enum class Unit { HZ, SECONDS };
+enum class Unit { HZ, SECONDS, DECIBELS };
 
 FreqParam identify(params::Kind kind, int32_t paramID) {
 	if (kind == params::Kind::PATCHED) {
@@ -112,6 +113,9 @@ FreqParam identify(params::Kind kind, int32_t paramID) {
 		}
 		if (paramID == params::UNPATCHED_TREBLE_FREQ) {
 			return FreqParam::TREBLE;
+		}
+		if (paramID == params::UNPATCHED_BASS || paramID == params::UNPATCHED_TREBLE) {
+			return FreqParam::EQ_GAIN;
 		}
 		// Ids below exist only in the GlobalEffectable section and would collide with sound-only
 		// unpatched ids, so require the GLOBAL kind for them
@@ -225,6 +229,17 @@ float computeValue(FreqParam which, float paramValue, Unit& unit) {
 		adjustment = paramValue * (6.0f / 32.0f);
 		neutral = 700000000.0f;
 		break;
+	case FreqParam::EQ_GAIN: {
+		// Bass/treble boost: positive = raw/2 + 2^30 gets squared into the shelf-band amplitude
+		// gain (positive/2^30)^2 (mod_controllable_audio.cpp bassAmount/trebleAmount + the <<3
+		// add-back in doEQ): unity at 25, +12 dB at 50, band removed entirely at 0.
+		unit = Unit::DECIBELS;
+		float positive = paramValue * 0.5f + 1073741824.0f;
+		if (positive < 1.0f) {
+			return -1000.0f; // gain 0: -inf dB
+		}
+		return 40.0f * std::log10(positive / 1073741824.0f);
+	}
 	case FreqParam::LFO_RATE:
 	case FreqParam::MOD_FX_RATE:
 		neutral = 121739.0f;
@@ -300,6 +315,22 @@ void appendUnitValue(float value, Unit unit, StringBuf& buf, Style style) {
 			buf.appendInt((int32_t)(value + 0.5f));
 			buf.append(sSuffix);
 		}
+		return;
+	}
+	if (unit == Unit::DECIBELS) {
+		char const* dbSuffix = (style == Style::FULL) ? " dB" : "dB";
+		if (value < -99.0f) {
+			buf.append("-inf");
+		}
+		else {
+			// Snap the tiny off-centre error at the unity detent to a clean 0.0
+			float snapped = (value > -0.05f && value < 0.05f) ? 0.0f : value;
+			if (snapped >= 0.05f) {
+				buf.append('+');
+			}
+			buf.appendFloat(snapped, 1, 1);
+		}
+		buf.append(dbSuffix);
 		return;
 	}
 	char const* hzSuffix = (style == Style::FULL) ? " Hz" : (style == Style::SHORT) ? "Hz" : "";
