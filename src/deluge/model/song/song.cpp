@@ -1000,7 +1000,7 @@ void Song::setClipLength(Clip* clip, uint32_t newLength, Action* action, bool ma
 	}
 }
 
-void Song::doubleClipLength(InstrumentClip* clip, Action* action) {
+void Song::doubleClipLength(Clip* clip, Action* action) {
 
 	char modelStackMemory[MODEL_STACK_MAX_SIZE];
 	ModelStackWithTimelineCounter* modelStack =

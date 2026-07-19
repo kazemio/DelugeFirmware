@@ -174,6 +174,27 @@ bool FXClip::shiftHorizontally(ModelStackWithTimelineCounter* modelStack, int32_
 	return true;
 }
 
+// The FX-clip half of the clip-multiply gesture (shift + horizontal encoder press): no note rows, so
+// only the param automation gets repeated into the new length. Mirrors the ParamManager part of
+// InstrumentClip::increaseLengthWithRepeats.
+void FXClip::increaseLengthWithRepeats(ModelStackWithTimelineCounter* modelStack, int32_t newLength,
+                                       IndependentNoteRowLengthIncrease independentNoteRowInstruction,
+                                       bool completelyRenderOutIterationDependence, Action* action) {
+	bool pingponging = (sequenceDirectionMode == SequenceDirection::PINGPONG);
+
+	if (newLength > loopLength) {
+		ModelStackWithThreeMainThings* modelStackWithParamManager =
+		    modelStack->addOtherTwoThingsButNoNoteRow(output->toModControllable(), &paramManager);
+		paramManager.generateRepeats(modelStackWithParamManager, loopLength, newLength, pingponging);
+	}
+
+	if (pingponging) {
+		sequenceDirectionMode = SequenceDirection::FORWARD; // Pingponging has been flattened out
+	}
+
+	loopLength = newLength;
+}
+
 RGB FXClip::getColour() {
 	return RGB::fromHuePastel(colourOffset * -8 / 3);
 }
