@@ -49,6 +49,10 @@ public:
 	void processCurrentPos(ModelStackWithTimelineCounter* modelStack, uint32_t ticksSinceLast) override;
 	bool shiftHorizontally(ModelStackWithTimelineCounter* modelStack, int32_t amount, bool shiftAutomation,
 	                       bool shiftSequenceAndMPE) override;
+	void increaseLengthWithRepeats(ModelStackWithTimelineCounter* modelStack, int32_t newLength,
+	                               IndependentNoteRowLengthIncrease independentNoteRowInstruction,
+	                               bool completelyRenderOutIterationDependence = false,
+	                               Action* action = nullptr) override;
 	RGB getColour();
 
 	bool wantsToBeginLinearRecording(Song* song) override { return false; }

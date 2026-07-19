@@ -1732,8 +1732,9 @@ void InstrumentClipView::doubleClipLengthAction() {
 		}
 	}
 
-	// Double the length, and duplicate the Clip content too
-	currentSong->doubleClipLength(getCurrentInstrumentClip(), action);
+	// Double the length, and duplicate the Clip content too. (Also reached for FX clips, whose
+	// override repeats just their automation - they have no note rows.)
+	currentSong->doubleClipLength(getCurrentClip(), action);
 
 	zoomToMax(false);
 

@@ -1601,7 +1601,9 @@ bool AutomationView::handleHorizontalEncoderButtonAction(bool on, bool isAudioCl
 	else if (onArrangerView) {
 		return true;
 	}
-	else if (isAudioClip) {
+	// (FX clips fall through to the multiply branch below - they have no sample to timestretch, and
+	// their increaseLengthWithRepeats override makes doubleClipLengthAction repeat the automation)
+	else if (isAudioClip && getCurrentClip()->type == ClipType::AUDIO) {
 		// removing time stretching by re-calculating clip length based on length of audio sample
 		if (on && Buttons::isButtonPressed(deluge::hid::button::Y_ENC) && currentUIMode == UI_MODE_NONE
 		    && getCurrentClip()->type == ClipType::AUDIO) {
@@ -3157,6 +3159,32 @@ void AutomationView::selectGlobalParam(int32_t offset, Clip* clip) {
 			        || id == params::UNPATCHED_SIDECHAIN_VOLUME || id == params::UNPATCHED_COMPRESSOR_THRESHOLD
 			        || (id >= params::UNPATCHED_FIRST_ARP_PARAM && id <= params::UNPATCHED_LAST_ARP_PARAM)
 			        || id == params::UNPATCHED_ARP_RATE || skipGlobalMacroLaneInScroll(id, true))) {
+
+				if (offset < 0) {
+					offset -= 1;
+				}
+				else if (offset > 0) {
+					offset += 1;
+				}
+				idx = getNextSelectedParamArrayPosition(offset, clip->lastSelectedParamArrayPosition,
+				                                        kNumGlobalParamsForAutomation);
+				id = globalParamsForAutomation[idx].second;
+			}
+		}
+		clip->lastSelectedParamID = id;
+		clip->lastSelectedParamKind = kind;
+		clip->lastSelectedParamArrayPosition = idx;
+	}
+	else if (clip->output->type == OutputType::AUDIO_FX) {
+		// FX clips drive the song master chain, so they get the arranger exclusion set
+		auto idx = getNextSelectedParamArrayPosition(offset, clip->lastSelectedParamArrayPosition,
+		                                             kNumGlobalParamsForAutomation);
+		auto [kind, id] = globalParamsForAutomation[idx];
+		{
+			while ((id == params::UNPATCHED_PITCH_ADJUST || id == params::UNPATCHED_SIDECHAIN_SHAPE
+			        || id == params::UNPATCHED_SIDECHAIN_VOLUME || id == params::UNPATCHED_COMPRESSOR_THRESHOLD
+			        || (id >= params::UNPATCHED_FIRST_ARP_PARAM && id <= params::UNPATCHED_LAST_ARP_PARAM)
+			        || id == params::UNPATCHED_ARP_RATE)) {
 
 				if (offset < 0) {
 					offset -= 1;

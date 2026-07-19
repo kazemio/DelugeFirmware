@@ -274,7 +274,7 @@ public:
 	void changeFillMode(bool on);
 	void loadNextSong();
 	void setClipLength(Clip* clip, uint32_t newLength, Action* action, bool mayReSyncClip = true);
-	void doubleClipLength(InstrumentClip* clip, Action* action = nullptr);
+	void doubleClipLength(Clip* clip, Action* action = nullptr);
 	Clip* getClipWithOutput(Output* output, bool mustBeActive = false, Clip* excludeClip = nullptr);
 	Error readFromFile(Deserializer& reader);
 	void writeToFile();
