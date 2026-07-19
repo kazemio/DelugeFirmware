@@ -3556,7 +3556,8 @@ traverseClips:
 // NOTE: for Instruments not currently in any list
 void Song::deleteOrAddToHibernationListOutput(Output* output) {
 	// If un-edited (which will include all CV Instruments, and any MIDI without mod knob assignments)
-	if (output->type == OutputType::AUDIO || output->type == OutputType::CV || !((Instrument*)output)->editedByUser) {
+	if (!outputTypeIsInstrument(output->type) || output->type == OutputType::CV
+	    || !((Instrument*)output)->editedByUser) {
 		output->prepareForHibernationOrDeletion();
 		deleteOutput(output);
 	}
@@ -3687,7 +3688,7 @@ void Song::deleteHibernatingInstrumentWithSlot(OutputType outputType, char const
 
 void Song::markAllInstrumentsAsEdited() {
 	for (Output* output = firstOutput; output; output = output->next) {
-		if (output->type == OutputType::AUDIO) {
+		if (!outputTypeIsInstrument(output->type)) {
 			continue;
 		}
 
@@ -4806,7 +4807,7 @@ bool Song::shouldOldOutputBeReplaced(Clip* clip, Availability* availabilityRequi
 }
 
 Output* Song::navigateThroughPresetsForInstrument(Output* output, int32_t offset) {
-	if (output->type == OutputType::AUDIO) {
+	if (!outputTypeIsInstrument(output->type)) {
 		return output;
 	}
 
@@ -5871,7 +5872,7 @@ TimelineCounter* Song::getTimelineCounterToRecordTo() {
 
 void Song::setDefaultVelocityForAllInstruments(uint8_t newDefaultVelocity) {
 	for (Output* output = firstOutput; output; output = output->next) {
-		if (output->type != OutputType::AUDIO) {
+		if (outputTypeIsInstrument(output->type)) {
 			((Instrument*)output)->defaultVelocity = newDefaultVelocity;
 		}
 	}
