@@ -320,6 +320,23 @@ bool anyMacroConfigured(Macro* macros);
 // whether it matched (and so consumed the message).
 bool tryMacro(MIDICable& cable, int32_t channelOrZone, int32_t ccNumber, int32_t value);
 
+// ── Midi-follow macro CCs ──
+// Midi-follow's default table maps CCs (114-117 out of the box, editable in MIDIFollow.XML as
+// "macro1".."macro4") to the macro lane params, so a follow-channel CC drives a clip's macros with
+// no per-song learning. The lane params are inert as params (nothing renders them), so such a CC
+// must never take midi-follow's generic param-write path: the follow CC handlers call
+// tryFollowMacro() first, which drives the macro itself with the same fan-out and consume
+// semantics as a learned source CC (see tryMacro).
+// The macro index a midi-follow table pair addresses: soundParamId holding a lane param
+// (UNPATCHED_START + UNPATCHED_MACRO_n) or globalParamId holding its GLOBAL analog
+// (UNPATCHED_GLOBAL_MACRO_n). -1 if neither does.
+int32_t followMacroIndex(int32_t soundParamId, int32_t globalParamId);
+// Drives that macro on the clip's host with the CC value (0..127); returns whether it fired, so
+// the caller consumes the CC. A pair addressing no macro, a clip that can't host macros, an
+// inactive or cascade-fed macro, or the feature being off all return false, and the CC falls
+// through to normal handling (on a MIDI clip that means it is forwarded out raw, like any CC).
+bool tryFollowMacro(Clip* clip, int32_t soundParamId, int32_t globalParamId, int32_t value);
+
 // Turning physical gold knob whichKnob (0 or 1): if any active macro on the active MIDI clip has that
 // knob as its source, accumulate its live position by offset and drive its targets. Returns whether
 // it matched (so the caller suppresses the knob's normal action - a knob source is dedicated).
