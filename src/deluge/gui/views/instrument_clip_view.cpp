@@ -56,7 +56,6 @@
 #include "model/action/action_logger.h"
 #include "model/clip/clip.h"
 #include "model/clip/instrument_clip.h"
-#include "model/consequence/consequence_instrument_clip_multiply.h"
 #include "model/consequence/consequence_note_array_change.h"
 #include "model/consequence/consequence_note_row_horizontal_shift.h"
 #include "model/consequence/consequence_note_row_length.h"
@@ -1689,46 +1688,6 @@ getOut: {}
 	pasteNotes(overwriteExisting, true, noScaling, previewOnly, selectedDrumOnly);
 
 	return Error::NONE;
-}
-
-void InstrumentClipView::doubleClipLengthAction() {
-
-	// If too big...
-	if (getCurrentClip()->loopLength > (kMaxSequenceLength >> 1)) {
-		display->displayPopup(deluge::l10n::get(deluge::l10n::String::STRING_FOR_MAXIMUM_LENGTH_REACHED));
-		return;
-	}
-
-	Action* action = actionLogger.getNewAction(ActionType::CLIP_MULTIPLY, ActionAddition::NOT_ALLOWED);
-
-	// Add the ConsequenceClipMultiply to the Action. This must happen before calling doubleClipLength(), which may add
-	// note changes and deletions, because when redoing, those have to happen after (and they'll have no effect at all,
-	// but who cares)
-	if (action) {
-		void* consMemory = GeneralMemoryAllocator::get().allocLowSpeed(sizeof(ConsequenceInstrumentClipMultiply));
-
-		if (consMemory) {
-			ConsequenceInstrumentClipMultiply* newConsequence = new (consMemory) ConsequenceInstrumentClipMultiply();
-			action->addConsequence(newConsequence);
-		}
-	}
-
-	// Double the length, and duplicate the Clip content too. (Also reached for FX clips, whose
-	// override repeats just their automation - they have no note rows.)
-	currentSong->doubleClipLength(getCurrentClip(), action);
-
-	zoomToMax(false);
-
-	if (action) {
-		action->xZoomClip[AFTER] = currentSong->xZoom[NAVIGATION_CLIP];
-		action->xScrollClip[AFTER] = currentSong->xScroll[NAVIGATION_CLIP];
-	}
-
-	displayZoomLevel();
-
-	if (display->haveOLED()) {
-		display->consoleText("Clip multiplied");
-	}
 }
 
 bool InstrumentClipView::createNewInstrument(OutputType newOutputType, bool is_dx) {
