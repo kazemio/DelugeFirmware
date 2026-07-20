@@ -1210,6 +1210,44 @@ bool tryMacro(MIDICable& cable, int32_t channelOrZone, int32_t ccNumber, int32_t
 	return matched;
 }
 
+int32_t followMacroIndex(int32_t soundParamId, int32_t globalParamId) {
+	if (soundParamId >= params::UNPATCHED_START + params::UNPATCHED_MACRO_1
+	    && soundParamId <= params::UNPATCHED_START + params::UNPATCHED_MACRO_4) {
+		return soundParamId - (params::UNPATCHED_START + params::UNPATCHED_MACRO_1);
+	}
+	if (globalParamId >= params::UNPATCHED_GLOBAL_MACRO_1 && globalParamId <= params::UNPATCHED_GLOBAL_MACRO_4) {
+		return globalParamId - params::UNPATCHED_GLOBAL_MACRO_1;
+	}
+	return -1;
+}
+
+bool tryFollowMacro(Clip* clip, int32_t soundParamId, int32_t globalParamId, int32_t value) {
+	int32_t macroIndex = followMacroIndex(soundParamId, globalParamId);
+	if (macroIndex < 0 || !isEnabled()) {
+		return false;
+	}
+	// same guard as tryMacro: never touch a mid-load song (boot-time controller CC bursts)
+	if (getCurrentUI() == &loadSongUI) {
+		return false;
+	}
+	Output* instrument = macroHost(clip);
+	if (!instrument) {
+		return false;
+	}
+	Macro& macro = instrument->macros[macroIndex];
+	// an inactive or cascade-fed macro doesn't fire, and the CC stays unconsumed - same as a
+	// learned source CC that finds no active macro
+	if (!macro.active || macroInputDriven(instrument->macros, macroIndex)) {
+		return false;
+	}
+
+	char modelStackMemory[MODEL_STACK_MAX_SIZE];
+	ModelStack* modelStack = setupModelStackWithSong(modelStackMemory, currentSong);
+	ModelStackWithTimelineCounter* modelStackWithTimelineCounter = modelStack->addTimelineCounter(clip);
+	sendToTargets(instrument, clip, modelStackWithTimelineCounter, macro, value);
+	return true;
+}
+
 bool tryKnobMacro(int32_t whichKnob, int32_t offset) {
 	if (!isEnabled() || getCurrentUI() == &loadSongUI) {
 		return false;
