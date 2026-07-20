@@ -831,6 +831,10 @@ void SoundEditor::updatePadLightsFor(MenuItem* currentItem) {
 		else if (getCurrentClip()->type == ClipType::AUDIO) {
 			setupShortcutsBlinkFromTable(currentItem, paramShortcutsForAudioClips);
 		}
+		// FX clips use the song-view menus/shortcuts (they edit the song-master FX chain)
+		else if (getCurrentClip()->type == ClipType::FX) {
+			setupShortcutsBlinkFromTable(currentItem, paramShortcutsForSongView);
+		}
 		// Or for Gate drums
 		else if (editingGateDrumRow()) {
 			for (int32_t y = 0; y < kDisplayHeight; y++) {
@@ -1167,6 +1171,18 @@ ActionResult SoundEditor::potentialShortcutPadAction(int32_t x, int32_t y, bool 
 
 			if (x <= 14) {
 				item = paramShortcutsForAudioClips[x][y];
+			}
+
+			goto doSetup;
+		}
+
+		// FX clips edit the song-master FX chain, so their shortcuts are the song-view ones (their
+		// root menu is soundEditorRootMenuSongView too). Without this they'd fall into the synth
+		// shortcut table below, whose menu items cast the ModControllable to Sound - crash.
+		else if (getCurrentClip()->type == ClipType::FX) {
+
+			if (x <= (kDisplayWidth - 2)) {
+				item = paramShortcutsForSongView[x][y];
 			}
 
 			goto doSetup;
