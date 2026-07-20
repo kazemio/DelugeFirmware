@@ -27,7 +27,6 @@
 #include "gui/views/arranger_view.h"
 #include "gui/views/automation_view.h"
 #include "gui/views/clip_type_splash.h"
-#include "gui/views/instrument_clip_view.h"
 #include "gui/views/macro_target_assign_overlay.h"
 #include "gui/views/session_view.h"
 #include "gui/views/view.h"
@@ -452,7 +451,7 @@ dontDeactivateMarker:
 				// Zoom to max if we weren't already there...
 				if (!zoomToMax()) {
 					// Or if we didn't need to do that, double Clip length
-					instrumentClipView.doubleClipLengthAction();
+					doubleClipLengthAction();
 				}
 				else {
 					displayZoomLevel();

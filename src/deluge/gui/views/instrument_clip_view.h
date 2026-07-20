@@ -179,7 +179,6 @@ public:
 	void drawAuditionSquare(uint8_t yDisplay, RGB thisImage[]);
 	void flashDefaultRootNote();
 	void selectEncoderAction(int8_t offset) override;
-	void doubleClipLengthAction();
 	void setSelectedDrum(Drum* drum, bool shouldRedrawStuff = true, Kit* selectedKit = nullptr,
 	                     bool shouldSendMidiFeedback = true);
 	bool isDrumAuditioned(Drum* drum);
