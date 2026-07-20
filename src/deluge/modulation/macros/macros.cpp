@@ -25,6 +25,7 @@
 #include "gui/views/view.h"
 #include "hid/display/display.h"
 #include "hid/led/indicator_leds.h"
+#include "io/midi/midi_engine.h"
 #include "io/midi/midi_follow.h"
 #include "model/action/action_logger.h"
 #include "model/clip/clip.h"
@@ -1210,6 +1211,35 @@ bool tryMacro(MIDICable& cable, int32_t channelOrZone, int32_t ccNumber, int32_t
 	return matched;
 }
 
+// Top-of-screen readout, exactly like a normal knob turn on a param: name as the title + value on
+// OLED (displayNotification), value alone on 7SEG (displayPopup). A named macro shows just its name
+// (the "Macro" context is implied); an unnamed one shows "Macro N". An inactive macro shows the
+// Inactive status instead of the value. Shared by gold-knob MACRO mode and the midi-follow macro
+// CCs (the latter gated on the follow Display Param setting).
+static void showMacroReadout(Macro& macro, int32_t macroIndex, int32_t pos) {
+	DEF_STACK_STRING_BUF(name, 30);
+	if (!macro.name.isEmpty()) {
+		name.append(macro.name.get());
+	}
+	else {
+		name.append(deluge::l10n::get(static_cast<deluge::l10n::String>(
+		    util::to_underlying(deluge::l10n::String::STRING_FOR_MACRO_1) + macroIndex)));
+	}
+	DEF_STACK_STRING_BUF(value, 16);
+	if (macro.active) {
+		value.appendInt(pos);
+	}
+	else {
+		value.append(deluge::l10n::get(deluge::l10n::String::STRING_FOR_MACRO_STATUS_INACTIVE));
+	}
+	if (display->haveOLED()) {
+		display->displayNotification(name.c_str(), value.c_str());
+	}
+	else {
+		display->displayPopup(value.c_str());
+	}
+}
+
 int32_t followMacroIndex(int32_t soundParamId, int32_t globalParamId) {
 	if (soundParamId >= params::UNPATCHED_START + params::UNPATCHED_MACRO_1
 	    && soundParamId <= params::UNPATCHED_START + params::UNPATCHED_MACRO_4) {
@@ -1245,6 +1275,10 @@ bool tryFollowMacro(Clip* clip, int32_t soundParamId, int32_t globalParamId, int
 	ModelStack* modelStack = setupModelStackWithSong(modelStackMemory, currentSong);
 	ModelStackWithTimelineCounter* modelStackWithTimelineCounter = modelStack->addTimelineCounter(clip);
 	sendToTargets(instrument, clip, modelStackWithTimelineCounter, macro, value);
+	// the follow Display Param setting covers macro CCs too: same readout as gold-knob MACRO mode
+	if (midiEngine.midiFollowDisplayParam) {
+		showMacroReadout(macro, macroIndex, value);
+	}
 	return true;
 }
 
@@ -1312,30 +1346,7 @@ bool driveMacro(int32_t macroIndex, int32_t offset) {
 		ModelStackWithTimelineCounter* modelStackWithTimelineCounter = modelStack->addTimelineCounter(clip);
 		sendToTargets(instrument, clip, modelStackWithTimelineCounter, macro, pos);
 	}
-	// Top-of-screen readout, exactly like a normal knob turn on a param: name as the title + value on
-	// OLED (displayNotification), value alone on 7SEG (displayPopup). A named macro shows just its name
-	// (the "Macro" context is implied); an unnamed one shows "Macro N".
-	DEF_STACK_STRING_BUF(name, 30);
-	if (!macro.name.isEmpty()) {
-		name.append(macro.name.get());
-	}
-	else {
-		name.append(deluge::l10n::get(static_cast<deluge::l10n::String>(
-		    util::to_underlying(deluge::l10n::String::STRING_FOR_MACRO_1) + macroIndex)));
-	}
-	DEF_STACK_STRING_BUF(value, 16);
-	if (macro.active) {
-		value.appendInt(pos);
-	}
-	else {
-		value.append(deluge::l10n::get(deluge::l10n::String::STRING_FOR_MACRO_STATUS_INACTIVE));
-	}
-	if (display->haveOLED()) {
-		display->displayNotification(name.c_str(), value.c_str());
-	}
-	else {
-		display->displayPopup(value.c_str());
-	}
+	showMacroReadout(macro, macroIndex, pos);
 	return true; // MACRO mode owns the knob regardless
 }
 
