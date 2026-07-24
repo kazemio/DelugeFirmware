@@ -41,6 +41,10 @@ bool isParamArpRhythm(Kind kind, int32_t paramID) {
 	return (kind == Kind::UNPATCHED_SOUND && paramID == UNPATCHED_ARP_RHYTHM);
 }
 
+bool isParamLfoSync(Kind kind, int32_t paramID) {
+	return (kind == Kind::UNPATCHED_SOUND && paramID >= UNPATCHED_LFO1_SYNC && paramID <= UNPATCHED_LFO4_SYNC);
+}
+
 bool isParamPitch(Kind kind, int32_t paramID) {
 	if (kind == Kind::PATCHED) {
 		return (paramID == LOCAL_PITCH_ADJUST) || (paramID == LOCAL_OSC_A_PITCH_ADJUST)
