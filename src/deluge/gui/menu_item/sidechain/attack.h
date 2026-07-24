@@ -16,6 +16,7 @@
  */
 #pragma once
 #include "gui/menu_item/integer.h"
+#include "gui/ui/param_freq_display.h"
 #include "gui/ui/sound_editor.h"
 #include "model/drum/drum.h"
 #include "model/instrument/kit.h"
@@ -62,6 +63,19 @@ public:
 	}
 	[[nodiscard]] int32_t getMaxValue() const override { return 50; }
 	[[nodiscard]] RenderingStyle getRenderingStyle() const override { return ATTACK; }
+
+	void drawPixelsForOled() override {
+		Integer::drawPixelsForOled();
+		if (auto* sidechain = getSidechain(is_reverb_sidechain_)) {
+			param_freq_display::drawMenuSidechainTimeLine(*sidechain, false, this->getValue());
+		}
+	}
+	void getNotificationValue(StringBuf& value) override {
+		Integer::getNotificationValue(value);
+		if (auto* sidechain = getSidechain(is_reverb_sidechain_)) {
+			param_freq_display::appendSidechainTimeSuffix(*sidechain, false, this->getValue(), value);
+		}
+	}
 
 	bool isRelevant(ModControllableAudio* modControllable, int32_t whichThing) override {
 		return !is_reverb_sidechain_ || AudioEngine::reverbSidechainVolume >= 0;
