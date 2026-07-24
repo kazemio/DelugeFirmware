@@ -227,12 +227,16 @@ const std::array<std::pair<params::Kind, ParamType>, kNumNonGlobalParamsForAutom
     {params::Kind::PATCHED, params::LOCAL_ENV_3_RELEASE},
     // LFO 1
     {params::Kind::PATCHED, params::GLOBAL_LFO_FREQ_1},
+    {params::Kind::UNPATCHED_SOUND, params::UNPATCHED_LFO1_SYNC},
     // LFO 2
     {params::Kind::PATCHED, params::LOCAL_LFO_LOCAL_FREQ_1},
+    {params::Kind::UNPATCHED_SOUND, params::UNPATCHED_LFO2_SYNC},
     // LFO 3
     {params::Kind::PATCHED, params::GLOBAL_LFO_FREQ_2},
+    {params::Kind::UNPATCHED_SOUND, params::UNPATCHED_LFO3_SYNC},
     // LFO 4
     {params::Kind::PATCHED, params::LOCAL_LFO_LOCAL_FREQ_2},
+    {params::Kind::UNPATCHED_SOUND, params::UNPATCHED_LFO4_SYNC},
     // Mod FX Offset, Feedback, Depth, Rate
     {params::Kind::UNPATCHED_SOUND, params::UNPATCHED_MOD_FX_OFFSET},
     {params::Kind::UNPATCHED_SOUND, params::UNPATCHED_MOD_FX_FEEDBACK},

@@ -215,14 +215,23 @@ enum UnpatchedSound : ParamType {
 	// The four macro automation lanes on synth tracks (the synth analog of the pseudo-CC macro
 	// lane params 128-131 on MIDI clips). Nothing in the render code reads them, so they are inert
 	// as sound params; the macro system mirrors its source into them and fans their automation out
-	// to the macro's target params. Their combined ids (UNPATCHED_START + index = 117-120) must not
+	// to the macro's target params. Their combined ids (UNPATCHED_START + index) must not
 	// be offered as macro target destinations - targets reach a macro lane only via the cascade ids.
 	UNPATCHED_MACRO_1,
 	UNPATCHED_MACRO_2,
 	UNPATCHED_MACRO_3,
 	UNPATCHED_MACRO_4,
+	UNPATCHED_LFO1_SYNC,
+	UNPATCHED_LFO2_SYNC,
+	UNPATCHED_LFO3_SYNC,
+	UNPATCHED_LFO4_SYNC,
 	UNPATCHED_SOUND_MAX_NUM,
 };
+
+/// Sound unpatched params double as macro-target destination bytes (UNPATCHED_START + id); ids at or above
+/// 128 - UNPATCHED_START would alias the macro cascade range.
+static_assert(UNPATCHED_START + UNPATCHED_SOUND_MAX_NUM <= 128,
+              "UnpatchedSound ids exceed macro destination byte space");
 
 /// Just for GlobalEffectables
 enum UnpatchedGlobal : ParamType {
@@ -286,6 +295,7 @@ bool isParamPan(Kind kind, int32_t paramID);
 bool isParamPitch(Kind kind, int32_t paramID);
 bool isParamPitchBend(Kind kind, int32_t paramID);
 bool isParamArpRhythm(Kind kind, int32_t paramID);
+bool isParamLfoSync(Kind kind, int32_t paramID);
 bool isParamStutter(Kind kind, int32_t paramID);
 bool isParamQuantizedStutter(Kind kind, int32_t paramID, ModControllableAudio* modControllableAudio);
 
@@ -381,8 +391,8 @@ const uint32_t unpatchedNonGlobalParamShortcuts[kDisplayWidth][kDisplayHeight] =
     {kNoParamID          , kNoParamID, kNoParamID        , kNoParamID, kNoParamID                , kNoParamID                     , kNoParamID           , kNoParamID},
     {kNoParamID          , kNoParamID, kNoParamID        , kNoParamID, UNPATCHED_SIDECHAIN_SHAPE , kNoParamID                     , UNPATCHED_BASS       , UNPATCHED_BASS_FREQ},
     {kNoParamID          , kNoParamID, UNPATCHED_ARP_GATE, kNoParamID, kNoParamID                , kNoParamID                     , UNPATCHED_TREBLE     , UNPATCHED_TREBLE_FREQ},
-    {kNoParamID          , kNoParamID, kNoParamID        , kNoParamID, UNPATCHED_MOD_FX_OFFSET   , UNPATCHED_MOD_FX_FEEDBACK      , kNoParamID           , kNoParamID},
-    {kNoParamID          , kNoParamID, kNoParamID        , kNoParamID, kNoParamID                , kNoParamID                     , kNoParamID           , kNoParamID},
+    {kNoParamID          , UNPATCHED_LFO1_SYNC, UNPATCHED_LFO3_SYNC, kNoParamID, UNPATCHED_MOD_FX_OFFSET   , UNPATCHED_MOD_FX_FEEDBACK      , kNoParamID           , kNoParamID},
+    {kNoParamID          , UNPATCHED_LFO2_SYNC, UNPATCHED_LFO4_SYNC, kNoParamID, kNoParamID                , kNoParamID                     , kNoParamID           , kNoParamID},
     {kNoParamID          , kNoParamID, kNoParamID        , kNoParamID, kNoParamID                , kNoParamID                     , kNoParamID           , kNoParamID},
     {kNoParamID          , UNPATCHED_SPREAD_VELOCITY, kNoParamID        , kNoParamID, kNoParamID                , kNoParamID                     , kNoParamID           , kNoParamID}
 };

@@ -1,5 +1,5 @@
 /*
- * Copyright © 2017-2023 Synthstrom Audible Limited
+ * Copyright (c) 2014-2023 Synthstrom Audible Limited
  *
  * This file is part of The Synthstrom Audible Deluge Firmware.
  *
@@ -14,16 +14,38 @@
  * You should have received a copy of the GNU General Public License along with this program.
  * If not, see <https://www.gnu.org/licenses/>.
  */
-
-#include "sync_level.h"
+#include "sync.h"
 #include "gui/l10n/l10n.h"
+#include "gui/ui/sound_editor.h"
 #include "hid/display/display.h"
 #include "hid/display/oled.h"
 #include "model/song/song.h"
+#include "modulation/params/param_set.h"
+#include "processing/sound/sound.h"
 
-namespace deluge::gui::menu_item {
+namespace deluge::gui::menu_item::lfo {
 
-void SyncLevel::drawValue() {
+void Sync::readCurrentValue() {
+	AutoParam& param = soundEditor.currentParamManager->getUnpatchedParamSet()->params[getP()];
+	if (param.containsSomething(-2147483648)) {
+		setValue(lfoSyncParamValueToSyncValue(param.getCurrentValue()));
+	}
+	else {
+		// Param never set: the legacy lfoConfig sync settings are what the engine is using
+		LFOConfig& config = soundEditor.currentSound->lfoConfig[lfoId_];
+		setValue(syncTypeAndLevelToSyncValue(config.syncType, config.syncLevel));
+	}
+}
+
+int32_t Sync::getFinalValue() {
+	return lfoSyncValueToParamValue(this->getValue());
+}
+
+void Sync::getNoteLengthName(StringBuf& buffer) {
+	syncValueToString(this->getValue(), buffer, currentSong->getInputTickMagnitude());
+}
+
+void Sync::drawValue() {
 	if (this->getValue() == 0) {
 		display->setText(l10n::get(l10n::String::STRING_FOR_OFF));
 	}
@@ -34,11 +56,7 @@ void SyncLevel::drawValue() {
 	}
 }
 
-void SyncLevel::getNoteLengthName(StringBuf& buffer) {
-	syncValueToString(this->getValue(), buffer, currentSong->getInputTickMagnitude());
-}
-
-void SyncLevel::drawPixelsForOled() {
+void Sync::drawPixelsForOled() {
 	char const* text = l10n::get(l10n::String::STRING_FOR_OFF);
 	DEF_STACK_STRING_BUF(buffer, 30);
 	if (this->getValue() != 0) {
@@ -48,19 +66,19 @@ void SyncLevel::drawPixelsForOled() {
 	hid::display::OLED::main.drawStringCentred(text, 20 + OLED_MAIN_TOPMOST_PIXEL, kTextBigSpacingX, kTextBigSizeY);
 }
 
-void SyncLevel::getColumnLabel(StringBuf& label) {
+void Sync::getColumnLabel(StringBuf& label) {
 	const int32_t value = getValue();
 	const ::SyncLevel level = syncValueToSyncLevel(value);
 
 	if (level == SYNC_LEVEL_NONE) {
-		return Enumeration::getColumnLabel(label);
+		return MenuItem::getColumnLabel(label);
 	}
 
 	// Draw the sync level as a label
 	syncValueToStringForHorzMenuLabel(syncValueToSyncType(value), level, label, currentSong->getInputTickMagnitude());
 }
 
-void SyncLevel::renderInHorizontalMenu(const SlotPosition& slot) {
+void Sync::renderInHorizontalMenu(const SlotPosition& slot) {
 	using namespace deluge::hid::display;
 	oled_canvas::Canvas& image = OLED::main;
 
@@ -87,18 +105,14 @@ void SyncLevel::renderInHorizontalMenu(const SlotPosition& slot) {
 	image.drawIconCentered(type_icon, slot.start_x, slot.width, slot.start_y + kHorizontalMenuSlotYOffset - 3);
 }
 
-int32_t SyncLevel::syncTypeAndLevelToMenuOption(::SyncType type, ::SyncLevel level) {
-	return syncTypeAndLevelToSyncValue(type, level);
-}
-
-void SyncLevel::getShortOption(StringBuf& opt) {
-	// Note length name trimmed to fit, or OFF
+void Sync::getNotificationValue(StringBuf& value) {
+	// Note length name, or OFF
 	if (this->getValue() != 0) {
-		getNoteLengthName(opt);
+		getNoteLengthName(value);
 	}
 	else {
-		opt.append(l10n::get(l10n::String::STRING_FOR_OFF));
+		value.append(l10n::get(l10n::String::STRING_FOR_OFF));
 	}
 }
 
-} // namespace deluge::gui::menu_item
+} // namespace deluge::gui::menu_item::lfo

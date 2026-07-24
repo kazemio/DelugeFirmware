@@ -33,7 +33,7 @@
 // four entries are the macro automation lanes (skipped while the macro feature is off, and always
 // on kit rows); they are lane selections only, never target destinations.
 constexpr int32_t kNumMacroLanesForAutomation = 4;
-constexpr int32_t kNumNonGlobalParamsForAutomation = 88;
+constexpr int32_t kNumNonGlobalParamsForAutomation = 92;
 extern const std::array<std::pair<deluge::modulation::params::Kind, deluge::modulation::params::ParamType>,
                         kNumNonGlobalParamsForAutomation>
     nonGlobalParamsForAutomation;

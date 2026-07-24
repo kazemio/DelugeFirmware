@@ -41,6 +41,10 @@ bool isParamArpRhythm(Kind kind, int32_t paramID) {
 	return (kind == Kind::UNPATCHED_SOUND && paramID == UNPATCHED_ARP_RHYTHM);
 }
 
+bool isParamLfoSync(Kind kind, int32_t paramID) {
+	return (kind == Kind::UNPATCHED_SOUND && paramID >= UNPATCHED_LFO1_SYNC && paramID <= UNPATCHED_LFO4_SYNC);
+}
+
 bool isParamPitch(Kind kind, int32_t paramID) {
 	if (kind == Kind::PATCHED) {
 		return (paramID == LOCAL_PITCH_ADJUST) || (paramID == LOCAL_OSC_A_PITCH_ADJUST)
@@ -323,7 +327,9 @@ char const* getParamDisplayName(Kind kind, int32_t p) {
 		static l10n::String const NAMES[UNPATCHED_SOUND_MAX_NUM - unc] = {
 		    [UNPATCHED_PORTAMENTO - unc] = STRING_FOR_PORTAMENTO, [UNPATCHED_MACRO_1 - unc] = STRING_FOR_MACRO_1,
 		    [UNPATCHED_MACRO_2 - unc] = STRING_FOR_MACRO_2,       [UNPATCHED_MACRO_3 - unc] = STRING_FOR_MACRO_3,
-		    [UNPATCHED_MACRO_4 - unc] = STRING_FOR_MACRO_4,
+		    [UNPATCHED_MACRO_4 - unc] = STRING_FOR_MACRO_4,       [UNPATCHED_LFO1_SYNC - unc] = STRING_FOR_LFO1_SYNC,
+		    [UNPATCHED_LFO2_SYNC - unc] = STRING_FOR_LFO2_SYNC,   [UNPATCHED_LFO3_SYNC - unc] = STRING_FOR_LFO3_SYNC,
+		    [UNPATCHED_LFO4_SYNC - unc] = STRING_FOR_LFO4_SYNC,
 		};
 		return l10n::get(NAMES[p - unc]);
 	}
@@ -441,6 +447,18 @@ constexpr char const* paramNameForFileConst(Kind const kind, ParamType const par
 
 		case UNPATCHED_MACRO_4:
 			return "macro4";
+
+		case UNPATCHED_LFO1_SYNC:
+			return "lfo1Sync";
+
+		case UNPATCHED_LFO2_SYNC:
+			return "lfo2Sync";
+
+		case UNPATCHED_LFO3_SYNC:
+			return "lfo3Sync";
+
+		case UNPATCHED_LFO4_SYNC:
+			return "lfo4Sync";
 
 		default:
 		    // Fall through to the other param kind handling
