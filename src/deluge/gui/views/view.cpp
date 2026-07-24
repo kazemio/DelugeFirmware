@@ -70,6 +70,7 @@
 #include "model/note/note_row.h"
 #include "model/settings/runtime_feature_settings.h"
 #include "model/song/song.h"
+#include "model/sync.h"
 #include "model/timeline_counter.h"
 #include "modulation/arpeggiator_rhythms.h"
 #include "modulation/automation/auto_param.h"
@@ -1188,6 +1189,16 @@ void View::displayModEncoderValuePopup(params::Kind kind, int32_t paramID, int32
 		else { // 64ths stutter: all 4 leds turned on
 			current_display_value = 64;
 			parameter_value.append("64ths");
+		}
+	}
+	// if turning an LFO sync mod encoder, display the sync note length instead of knob position
+	else if (isParamLfoSync(kind, paramID)) {
+		current_display_value = (newKnobPos + kKnobPosOffset) * NUM_SYNC_VALUES / (kMaxKnobPos + 1);
+		if (current_display_value == 0) {
+			parameter_value.append(l10n::get(l10n::String::STRING_FOR_OFF));
+		}
+		else {
+			syncValueToString(current_display_value, parameter_value, currentSong->getInputTickMagnitude());
 		}
 	}
 	// if turning arpeggiator rhythm mod encoder
