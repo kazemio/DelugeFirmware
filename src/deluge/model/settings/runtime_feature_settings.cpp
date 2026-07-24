@@ -207,6 +207,9 @@ void RuntimeFeatureSettings::init() {
 	// Filter Frequency Display
 	SetupOnOffSetting(settings[RuntimeFeatureSettingType::ShowRealUnits], STRING_FOR_COMMUNITY_FEATURE_SHOW_REAL_UNITS,
 	                  "showRealUnits", RuntimeFeatureStateToggle::Off);
+	// ModFX after DOTT (post multiband compressor)
+	SetupOnOffSetting(settings[RuntimeFeatureSettingType::ModFXPostDOTT], STRING_FOR_COMMUNITY_FEATURE_MODFX_POST_DOTT,
+	                  "modFxPostDott", RuntimeFeatureStateToggle::Off);
 }
 
 void RuntimeFeatureSettings::readSettingsFromFile() {

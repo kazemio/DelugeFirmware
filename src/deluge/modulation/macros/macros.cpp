@@ -1462,6 +1462,11 @@ static void readTargetFromFile(Deserializer& reader, MacroTargetSlot& target, in
 	while (*(attrName = reader.readNextTagOrAttributeName())) {
 		if (!strcmp(attrName, "cc") && domain == Domain::MIDI) {
 			destination = reader.readTagOrAttributeValueInt();
+			// Cascade targets were lane ids 128-131 before kMacroParamIDBase moved to 176
+			if (destination >= kMacroParamIDBaseLegacy && destination < kMacroParamIDBaseLegacy + kNumMacroParams
+			    && kMacroParamIDBase != kMacroParamIDBaseLegacy) {
+				destination = kMacroParamIDBase + (destination - kMacroParamIDBaseLegacy);
+			}
 		}
 		else if (!strcmp(attrName, "source") && domain == Domain::SYNTH) {
 			cableFrom = stringToSource(reader.readTagOrAttributeValue());

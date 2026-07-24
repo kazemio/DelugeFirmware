@@ -116,7 +116,12 @@ void markHostEdited(Output* host);
 // Each macro also appears as an automatable "lane" in MIDI automation view, stored as a pseudo-CC
 // MIDIParam at these IDs. They sit above the 0..127 CC byte range so no real target CC (max 127)
 // can collide, and they never emit MIDI (suppressed in MIDIParamCollection::sendMIDI).
-constexpr int32_t kMacroParamIDBase = 128;
+// The base also caps the SYNTH destination byte space (UNPATCHED_START + UnpatchedSound id must
+// stay below it - static_assert in params/param.h): it was 128 until the DOTT multiband params
+// grew UnpatchedShared past that, and 176 leaves headroom for both. Old songs' numeric lane ids
+// (128-131) are remapped on load in MIDIInstrument::readMIDIParamFromFile / readTargetFromFile.
+constexpr int32_t kMacroParamIDBase = 176;
+constexpr int32_t kMacroParamIDBaseLegacy = 128; // pre-DOTT lane ids, remapped at file-read time
 constexpr int32_t kNumMacroParams = kNumMacros;
 inline bool isMacroParamID(int32_t id) {
 	return id >= kMacroParamIDBase && id < kMacroParamIDBase + kNumMacroParams;
@@ -161,8 +166,8 @@ inline uint16_t makeCableDestination(int32_t patchedParamID, PatchSource source)
 }
 
 // ── Destination byte space ──
-// Internal-domain destination code <-> (Kind, paramID). Cascade ids (128-131) decode to the
-// downstream macro's own lane param, which is where a cascade bake writes. SYNTH and GLOBAL encode
+// Internal-domain destination code <-> (Kind, paramID). Cascade ids (kMacroParamIDBase+idx) decode
+// to the downstream macro's own lane param, which is where a cascade bake writes. SYNTH and GLOBAL encode
 // the byte differently (see the .cpp); the byte value alone is domain-ambiguous, so always pass the
 // clip's domain.
 void decodeDestination(Domain domain, uint16_t destination, deluge::modulation::params::Kind* kindOut, int32_t* idOut);

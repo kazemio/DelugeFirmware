@@ -28,6 +28,7 @@
 #include "model/clip/instrument_clip.h"
 #include "model/song/song.h"
 #include "modulation/arpeggiator.h"
+#include "modulation/macros/macros.h"
 #include "modulation/midi/midi_param.h"
 #include "modulation/midi/midi_param_collection.h"
 #include "modulation/params/param_set.h"
@@ -580,6 +581,11 @@ Error MIDIInstrument::readMIDIParamFromFile(Deserializer& reader, int32_t readAu
 			// will be sent as mod wheel and also map to internal mono expression
 			if (cc == CC_EXTERNAL_MOD_WHEEL) {
 				cc = CC_NUMBER_Y_AXIS;
+			}
+			// Macro lane pseudo-CCs were ids 128-131 before kMacroParamIDBase moved to 176
+			if (cc >= Macros::kMacroParamIDBaseLegacy && cc < Macros::kMacroParamIDBaseLegacy + Macros::kNumMacroParams
+			    && Macros::kMacroParamIDBase != Macros::kMacroParamIDBaseLegacy) {
+				cc = Macros::kMacroParamIDBase + (cc - Macros::kMacroParamIDBaseLegacy);
 			}
 
 			reader.exitTag("cc");

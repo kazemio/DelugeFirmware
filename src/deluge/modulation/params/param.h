@@ -187,6 +187,21 @@ enum UnpatchedShared : ParamType {
 	UNPATCHED_MOD_FX_FEEDBACK,
 	UNPATCHED_SIDECHAIN_SHAPE,
 	UNPATCHED_COMPRESSOR_THRESHOLD,
+	// Multiband compressor params
+	UNPATCHED_MB_COMPRESSOR_CHARACTER,
+	UNPATCHED_MB_COMPRESSOR_LOW_CROSSOVER,
+	UNPATCHED_MB_COMPRESSOR_HIGH_CROSSOVER,
+	UNPATCHED_MB_COMPRESSOR_THRESHOLD,
+	UNPATCHED_MB_COMPRESSOR_RATIO,
+	UNPATCHED_MB_COMPRESSOR_ATTACK,
+	UNPATCHED_MB_COMPRESSOR_RELEASE,
+	UNPATCHED_MB_COMPRESSOR_SKEW,
+	UNPATCHED_MB_COMPRESSOR_LOW_LEVEL,
+	UNPATCHED_MB_COMPRESSOR_MID_LEVEL,
+	UNPATCHED_MB_COMPRESSOR_HIGH_LEVEL,
+	UNPATCHED_MB_COMPRESSOR_OUTPUT_GAIN,
+	UNPATCHED_MB_COMPRESSOR_VIBE,
+	UNPATCHED_MB_COMPRESSOR_BLEND,
 	// Arp
 	UNPATCHED_FIRST_ARP_PARAM,
 	UNPATCHED_ARP_GATE = UNPATCHED_FIRST_ARP_PARAM,
@@ -229,9 +244,10 @@ enum UnpatchedSound : ParamType {
 };
 
 /// Sound unpatched params double as macro-target destination bytes (UNPATCHED_START + id); ids at or above
-/// 128 - UNPATCHED_START would alias the macro cascade range.
-static_assert(UNPATCHED_START + UNPATCHED_SOUND_MAX_NUM <= 128,
-              "UnpatchedSound ids exceed macro destination byte space");
+/// kMacroParamIDBase (176, modulation/macros/macros.h) - UNPATCHED_START would alias the macro
+/// cascade range in the SYNTH destination byte space.
+static_assert(UNPATCHED_START + UNPATCHED_SOUND_MAX_NUM <= 176,
+              "UnpatchedSound ids exceed macro destination byte space (see kMacroParamIDBase)");
 
 /// Just for GlobalEffectables
 enum UnpatchedGlobal : ParamType {
@@ -421,4 +437,48 @@ const uint32_t unpatchedGlobalParamShortcuts[kDisplayWidth][kDisplayHeight] = {
 // clang-format on
 
 uint32_t expressionParamFromShortcut(int x, int y);
+
+/// Zone param metadata for zone-based menu items (DOTT multiband compressor)
+struct ZoneParamInfo {
+	int32_t zoneCount;
+	int32_t resolution;
+};
+
+/// Get zone param info for patched params. No patched zone params exist in this port
+/// (owlet's scatter system has them); the overload exists for the zone_based.h templates.
+constexpr ZoneParamInfo getZoneParamInfo(ParamType paramId) {
+	return {1, 128};
+}
+
+/// Get the unpatched fallback param for a patched param (-1 if none). Always -1 in this port;
+/// see getZoneParamInfo(ParamType).
+constexpr int32_t getUnpatchedFallback(ParamType patchedId) {
+	return -1;
+}
+
+/// Get zone param info for unpatched params
+constexpr ZoneParamInfo getZoneParamInfo(UnpatchedShared paramId) {
+	switch (paramId) {
+	case UNPATCHED_MB_COMPRESSOR_CHARACTER:
+	case UNPATCHED_MB_COMPRESSOR_VIBE:
+		return {8, 1024}; // 8 zones for DOTT character/vibe
+	default:
+		return {1, 128}; // Default non-zone param
+	}
+}
+
+/// Check if an unpatched param is a high-resolution zone param (1024+ steps)
+/// Used by gold knob to apply finer control for these params
+constexpr bool isHighResZoneParam(UnpatchedShared paramId) {
+	auto info = getZoneParamInfo(paramId);
+	return info.resolution >= 1024;
+}
+
+/// Get resolution divisor for high-res params (how much to divide gold knob offset)
+/// Returns 1 for standard params, higher values for zone params (e.g., 8 for 1024-step)
+constexpr int32_t getHighResOffsetDivisor(UnpatchedShared paramId) {
+	auto info = getZoneParamInfo(paramId);
+	return info.resolution / 128;
+}
+
 } // namespace deluge::modulation::params

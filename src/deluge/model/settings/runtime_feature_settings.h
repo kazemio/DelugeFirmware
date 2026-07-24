@@ -68,6 +68,7 @@ enum RuntimeFeatureSettingType : uint32_t {
 	ShowBatteryLevel,
 	MacroSystem,
 	ShowRealUnits,
+	ModFXPostDOTT,
 	MaxElement // Keep as boundary
 };
 
