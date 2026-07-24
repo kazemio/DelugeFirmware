@@ -809,11 +809,6 @@ bool ModControllableAudio::readParamTagFromFile(Deserializer& reader, char const
 		reader.exitTag("mbCompressorBlend");
 	}
 
-	// Multiband compressor state
-	else if (multibandCompressor.readTag(reader, tagName)) {
-		// Reading handled internally
-	}
-
 	// Arpeggiator stuff
 
 	else if (!strcmp(tagName, "arpeggiatorGate")) {
@@ -937,6 +932,11 @@ Error ModControllableAudio::readTagFromFile(Deserializer& reader, char const* ta
 	}
 
 	// Arpeggiator
+
+	// Multiband compressor state
+	else if (multibandCompressor.readTag(reader, tagName)) {
+		// Reading handled internally
+	}
 
 	else if (!strcmp(tagName, "arpeggiator") && arpSettings != nullptr) {
 		// Set default values in case they are not configured
