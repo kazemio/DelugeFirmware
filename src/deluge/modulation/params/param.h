@@ -413,6 +413,18 @@ struct ZoneParamInfo {
 	int32_t resolution;
 };
 
+/// Get zone param info for patched params. No patched zone params exist in this port
+/// (owlet's scatter system has them); the overload exists for the zone_based.h templates.
+constexpr ZoneParamInfo getZoneParamInfo(ParamType paramId) {
+	return {1, 128};
+}
+
+/// Get the unpatched fallback param for a patched param (-1 if none). Always -1 in this port;
+/// see getZoneParamInfo(ParamType).
+constexpr int32_t getUnpatchedFallback(ParamType patchedId) {
+	return -1;
+}
+
 /// Get zone param info for unpatched params
 constexpr ZoneParamInfo getZoneParamInfo(UnpatchedShared paramId) {
 	switch (paramId) {
