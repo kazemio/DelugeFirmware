@@ -273,6 +273,10 @@ void MidiFollow::initDefaultMappings() {
 	soundParamToCC[params::UNPATCHED_START + params::UNPATCHED_BASS] = 86;
 	ccToSoundParam[87] = params::UNPATCHED_START + params::UNPATCHED_TREBLE;
 	soundParamToCC[params::UNPATCHED_START + params::UNPATCHED_TREBLE] = 87;
+	ccToSoundParam[88] = params::UNPATCHED_START + params::UNPATCHED_LFO1_SYNC;
+	soundParamToCC[params::UNPATCHED_START + params::UNPATCHED_LFO1_SYNC] = 88;
+	ccToSoundParam[89] = params::UNPATCHED_START + params::UNPATCHED_LFO2_SYNC;
+	soundParamToCC[params::UNPATCHED_START + params::UNPATCHED_LFO2_SYNC] = 89;
 	ccToSoundParam[91] = params::GLOBAL_REVERB_AMOUNT;
 	soundParamToCC[params::GLOBAL_REVERB_AMOUNT] = 91;
 	ccToSoundParam[93] = params::GLOBAL_MOD_FX_DEPTH;
@@ -301,6 +305,11 @@ void MidiFollow::initDefaultMappings() {
 	soundParamToCC[params::UNPATCHED_START + params::UNPATCHED_ARP_SWAP_PROBABILITY] = 112;
 	ccToSoundParam[113] = params::UNPATCHED_START + params::UNPATCHED_ARP_GLIDE_PROBABILITY;
 	soundParamToCC[params::UNPATCHED_START + params::UNPATCHED_ARP_GLIDE_PROBABILITY] = 113;
+	// 114-117 are reserved for future use
+	ccToSoundParam[118] = params::UNPATCHED_START + params::UNPATCHED_LFO3_SYNC;
+	soundParamToCC[params::UNPATCHED_START + params::UNPATCHED_LFO3_SYNC] = 118;
+	ccToSoundParam[119] = params::UNPATCHED_START + params::UNPATCHED_LFO4_SYNC;
+	soundParamToCC[params::UNPATCHED_START + params::UNPATCHED_LFO4_SYNC] = 119;
 
 	// GLOBAL PARAMS
 	// NOTE: Here you add the global param, assigning the same CC as its relative sound param

@@ -123,7 +123,7 @@ const uint32_t mutePadActionUIModes[] = {UI_MODE_NOTES_PRESSED, UI_MODE_AUDITION
 
 const uint32_t verticalScrollUIModes[] = {UI_MODE_NOTES_PRESSED, UI_MODE_AUDITIONING, UI_MODE_RECORD_COUNT_IN, 0};
 
-constexpr int32_t kNumNonGlobalParamsForAutomation = 83;
+constexpr int32_t kNumNonGlobalParamsForAutomation = 87;
 constexpr int32_t kNumGlobalParamsForAutomation = 39;
 
 // synth and kit rows FX - sorted in the order that Parameters are scrolled through on the display
@@ -199,12 +199,16 @@ const std::array<std::pair<params::Kind, ParamType>, kNumNonGlobalParamsForAutom
     {params::Kind::PATCHED, params::LOCAL_ENV_3_RELEASE},
     // LFO 1
     {params::Kind::PATCHED, params::GLOBAL_LFO_FREQ_1},
+    {params::Kind::UNPATCHED_SOUND, params::UNPATCHED_LFO1_SYNC},
     // LFO 2
     {params::Kind::PATCHED, params::LOCAL_LFO_LOCAL_FREQ_1},
+    {params::Kind::UNPATCHED_SOUND, params::UNPATCHED_LFO2_SYNC},
     // LFO 3
     {params::Kind::PATCHED, params::GLOBAL_LFO_FREQ_2},
+    {params::Kind::UNPATCHED_SOUND, params::UNPATCHED_LFO3_SYNC},
     // LFO 4
     {params::Kind::PATCHED, params::LOCAL_LFO_LOCAL_FREQ_2},
+    {params::Kind::UNPATCHED_SOUND, params::UNPATCHED_LFO4_SYNC},
     // Mod FX Offset, Feedback, Depth, Rate
     {params::Kind::UNPATCHED_SOUND, params::UNPATCHED_MOD_FX_OFFSET},
     {params::Kind::UNPATCHED_SOUND, params::UNPATCHED_MOD_FX_FEEDBACK},
