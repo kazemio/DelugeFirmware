@@ -136,6 +136,12 @@ void Sound::initParams(ParamManager* paramManager) {
 	unpatchedParams->kind = params::Kind::UNPATCHED_SOUND;
 
 	unpatchedParams->params[params::UNPATCHED_PORTAMENTO].setCurrentValueBasicForSetup(-2147483648);
+	// -2147483648 doubles as the "never set" sentinel: while an LFO sync param holds it, the legacy
+	// lfoConfig sync settings stay authoritative (see updateLFOConfigFromUnpatchedParams())
+	unpatchedParams->params[params::UNPATCHED_LFO1_SYNC].setCurrentValueBasicForSetup(-2147483648);
+	unpatchedParams->params[params::UNPATCHED_LFO2_SYNC].setCurrentValueBasicForSetup(-2147483648);
+	unpatchedParams->params[params::UNPATCHED_LFO3_SYNC].setCurrentValueBasicForSetup(-2147483648);
+	unpatchedParams->params[params::UNPATCHED_LFO4_SYNC].setCurrentValueBasicForSetup(-2147483648);
 
 	PatchedParamSet* patchedParams = paramManager->getPatchedParamSet();
 	patchedParams->params[params::LOCAL_VOLUME].setCurrentValueBasicForSetup(0);
@@ -1469,13 +1475,12 @@ PatchCableAcceptance Sound::maySourcePatchToParam(PatchSource s, uint8_t p, Para
 		           ? PatchCableAcceptance::ALLOWED
 		           : PatchCableAcceptance::EDITABLE;
 
+	// Cables to a synced LFO's rate are inert (getGlobalLFOPhaseIncrement() ignores the param while synced),
+	// so always allowed. Sync is now changeable at automation/MIDI rate, which makes stripping cables on
+	// sync-on both wrong (sync may turn back off mid-song) and too expensive to re-evaluate per change.
 	case params::GLOBAL_LFO_FREQ_1:
-		return (lfoConfig[LFO1_ID].syncLevel == SYNC_LEVEL_NONE) ? PatchCableAcceptance::ALLOWED
-		                                                         : PatchCableAcceptance::DISALLOWED;
-
 	case params::GLOBAL_LFO_FREQ_2:
-		return (lfoConfig[LFO3_ID].syncLevel == SYNC_LEVEL_NONE) ? PatchCableAcceptance::ALLOWED
-		                                                         : PatchCableAcceptance::DISALLOWED;
+		return PatchCableAcceptance::ALLOWED;
 
 		// Nothing may patch to post-fx volume. This is for manual control only. The sidechain patches to post-reverb
 		// volume, and everything else patches to per-voice, "local" volume
@@ -2380,6 +2385,8 @@ void Sound::render(ModelStackWithThreeMainThings* modelStack, std::span<StereoSa
 
 	ParamManagerForTimeline* paramManager = (ParamManagerForTimeline*)modelStack->paramManager;
 
+	updateLFOConfigFromUnpatchedParams(paramManager->getUnpatchedParamSet());
+
 	// Do global LFO
 	if (paramManager->getPatchCableSet()->isSourcePatchedToSomething(PatchSource::LFO_GLOBAL_1)) {
 		const auto patchSourceLFOGlobalUnderlying = util::to_underlying(PatchSource::LFO_GLOBAL_1);
@@ -2731,6 +2738,30 @@ uint32_t Sound::getSyncedLFOPhaseIncrement(const LFOConfig& config) {
 		break;
 	}
 	return phaseIncrement;
+}
+
+void Sound::updateLFOConfigFromUnpatchedParams(UnpatchedParamSet* unpatchedParams) {
+	bool globalConfigChanged = false;
+	for (int32_t lfoId = 0; lfoId < LFO_COUNT; lfoId++) {
+		AutoParam& param = unpatchedParams->params[params::UNPATCHED_LFO1_SYNC + lfoId];
+		if (!param.containsSomething(-2147483648)) {
+			// Param never set: the legacy lfoConfig sync settings (from the lfoN XML tags) stay authoritative
+			continue;
+		}
+		int32_t syncValue = lfoSyncParamValueToSyncValue(param.getCurrentValue());
+		SyncType newType = syncValueToSyncType(syncValue);
+		SyncLevel newLevel = syncValueToSyncLevel(syncValue);
+		LFOConfig& config = lfoConfig[lfoId];
+		if (config.syncType != newType || config.syncLevel != newLevel) {
+			config.syncType = newType;
+			config.syncLevel = newLevel;
+			// Local LFOs (2/4) pick the new config up directly; only the globals need a phase resync
+			globalConfigChanged |= (lfoId == LFO1_ID || lfoId == LFO3_ID);
+		}
+	}
+	if (globalConfigChanged) {
+		resyncGlobalLFOs();
+	}
 }
 
 void Sound::resyncGlobalLFOs() {
@@ -3248,6 +3279,17 @@ Error Sound::readFromFile(Deserializer& reader, ModelStackWithModControllable* m
 
 		possiblySetupDefaultExpressionPatching(&paramManager);
 
+		// Migrate the legacy per-LFO sync tags into the sync params so they display correctly, but only
+		// if the file didn't carry the params itself (in which case they've already won over lfoConfig)
+		UnpatchedParamSet* unpatchedParams = paramManager.getUnpatchedParamSet();
+		for (int32_t lfoId = 0; lfoId < LFO_COUNT; lfoId++) {
+			AutoParam& param = unpatchedParams->params[params::UNPATCHED_LFO1_SYNC + lfoId];
+			if (!param.containsSomething(-2147483648) && lfoConfig[lfoId].syncLevel != SYNC_LEVEL_NONE) {
+				param.setCurrentValueBasicForSetup(lfoSyncValueToParamValue(
+				    syncTypeAndLevelToSyncValue(lfoConfig[lfoId].syncType, lfoConfig[lfoId].syncLevel)));
+			}
+		}
+
 		// And, we file it with the Song
 		modelStack->song->backUpParamManager(this, (Clip*)modelStack->getTimelineCounterAllowNull(), &paramManager,
 		                                     true);
@@ -3753,6 +3795,22 @@ bool Sound::readParamTagFromFile(Deserializer& reader, char const* tagName, Para
 		unpatchedParams->readParam(reader, unpatchedParamsSummary, params::UNPATCHED_PORTAMENTO, readAutomationUpToPos);
 		reader.exitTag("portamento");
 	}
+	else if (!strcmp(tagName, "lfo1Sync")) {
+		unpatchedParams->readParam(reader, unpatchedParamsSummary, params::UNPATCHED_LFO1_SYNC, readAutomationUpToPos);
+		reader.exitTag("lfo1Sync");
+	}
+	else if (!strcmp(tagName, "lfo2Sync")) {
+		unpatchedParams->readParam(reader, unpatchedParamsSummary, params::UNPATCHED_LFO2_SYNC, readAutomationUpToPos);
+		reader.exitTag("lfo2Sync");
+	}
+	else if (!strcmp(tagName, "lfo3Sync")) {
+		unpatchedParams->readParam(reader, unpatchedParamsSummary, params::UNPATCHED_LFO3_SYNC, readAutomationUpToPos);
+		reader.exitTag("lfo3Sync");
+	}
+	else if (!strcmp(tagName, "lfo4Sync")) {
+		unpatchedParams->readParam(reader, unpatchedParamsSummary, params::UNPATCHED_LFO4_SYNC, readAutomationUpToPos);
+		reader.exitTag("lfo4Sync");
+	}
 	else if (!strcmp(tagName, "compressorShape")) {
 		unpatchedParams->readParam(reader, unpatchedParamsSummary, params::UNPATCHED_SIDECHAIN_SHAPE,
 		                           readAutomationUpToPos);
@@ -4035,6 +4093,10 @@ void Sound::writeParamsToFile(Serializer& writer, ParamManager* paramManager, bo
 	UnpatchedParamSet* unpatchedParams = paramManager->getUnpatchedParamSet();
 
 	unpatchedParams->writeParamAsAttribute(writer, "portamento", params::UNPATCHED_PORTAMENTO, writeAutomation);
+	unpatchedParams->writeParamAsAttribute(writer, "lfo1Sync", params::UNPATCHED_LFO1_SYNC, writeAutomation);
+	unpatchedParams->writeParamAsAttribute(writer, "lfo2Sync", params::UNPATCHED_LFO2_SYNC, writeAutomation);
+	unpatchedParams->writeParamAsAttribute(writer, "lfo3Sync", params::UNPATCHED_LFO3_SYNC, writeAutomation);
+	unpatchedParams->writeParamAsAttribute(writer, "lfo4Sync", params::UNPATCHED_LFO4_SYNC, writeAutomation);
 	unpatchedParams->writeParamAsAttribute(writer, "compressorShape", params::UNPATCHED_SIDECHAIN_SHAPE,
 	                                       writeAutomation);
 
