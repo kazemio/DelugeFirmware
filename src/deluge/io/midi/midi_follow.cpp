@@ -273,6 +273,8 @@ void MidiFollow::initDefaultMappings() {
 	soundParamToCC[params::UNPATCHED_START + params::UNPATCHED_BASS] = 86;
 	ccToSoundParam[87] = params::UNPATCHED_START + params::UNPATCHED_TREBLE;
 	soundParamToCC[params::UNPATCHED_START + params::UNPATCHED_TREBLE] = 87;
+	ccToSoundParam[90] = params::UNPATCHED_START + params::UNPATCHED_SATURATION;
+	soundParamToCC[params::UNPATCHED_START + params::UNPATCHED_SATURATION] = 90;
 	ccToSoundParam[91] = params::GLOBAL_REVERB_AMOUNT;
 	soundParamToCC[params::GLOBAL_REVERB_AMOUNT] = 91;
 	ccToSoundParam[93] = params::GLOBAL_MOD_FX_DEPTH;
@@ -353,6 +355,8 @@ void MidiFollow::initDefaultMappings() {
 	globalParamToCC[params::UNPATCHED_BASS] = 71;
 	ccToGlobalParam[87] = params::UNPATCHED_TREBLE;
 	globalParamToCC[params::UNPATCHED_TREBLE] = 82;
+	ccToGlobalParam[90] = params::UNPATCHED_SATURATION;
+	globalParamToCC[params::UNPATCHED_SATURATION] = 90;
 	ccToGlobalParam[91] = params::UNPATCHED_REVERB_SEND_AMOUNT;
 	globalParamToCC[params::UNPATCHED_REVERB_SEND_AMOUNT] = 91;
 	ccToGlobalParam[93] = params::UNPATCHED_MOD_FX_DEPTH;
