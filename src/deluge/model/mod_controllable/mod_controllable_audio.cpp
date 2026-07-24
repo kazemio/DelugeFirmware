@@ -498,6 +498,8 @@ void ModControllableAudio::writeAttributesToFile(Serializer& writer) {
 	if (clippingAmount) {
 		writer.writeAttribute("clippingAmount", clippingAmount);
 	}
+	// Multiband compressor state
+	multibandCompressor.writeToFile(writer);
 }
 
 void ModControllableAudio::writeTagsToFile(Serializer& writer) {
@@ -589,6 +591,39 @@ void ModControllableAudio::writeParamAttributesToFile(Serializer& writer, ParamM
 	// Community Firmware parameters (always write them after the official ones, just before closing the parent tag)
 	unpatchedParams->writeParamAsAttribute(writer, "compressorThreshold", params::UNPATCHED_COMPRESSOR_THRESHOLD,
 	                                       writeAutomation, false, valuesForOverride);
+
+	// Multiband compressor params
+	unpatchedParams->writeParamAsAttribute(writer, "mbCompressorCharacter", params::UNPATCHED_MB_COMPRESSOR_CHARACTER,
+	                                       writeAutomation, true, valuesForOverride);
+	unpatchedParams->writeParamAsAttribute(writer, "mbCompressorLowCrossover",
+	                                       params::UNPATCHED_MB_COMPRESSOR_LOW_CROSSOVER, writeAutomation, true,
+	                                       valuesForOverride);
+	unpatchedParams->writeParamAsAttribute(writer, "mbCompressorHighCrossover",
+	                                       params::UNPATCHED_MB_COMPRESSOR_HIGH_CROSSOVER, writeAutomation, true,
+	                                       valuesForOverride);
+	unpatchedParams->writeParamAsAttribute(writer, "mbCompressorThreshold", params::UNPATCHED_MB_COMPRESSOR_THRESHOLD,
+	                                       writeAutomation, true, valuesForOverride);
+	unpatchedParams->writeParamAsAttribute(writer, "mbCompressorRatio", params::UNPATCHED_MB_COMPRESSOR_RATIO,
+	                                       writeAutomation, true, valuesForOverride);
+	unpatchedParams->writeParamAsAttribute(writer, "mbCompressorAttack", params::UNPATCHED_MB_COMPRESSOR_ATTACK,
+	                                       writeAutomation, true, valuesForOverride);
+	unpatchedParams->writeParamAsAttribute(writer, "mbCompressorRelease", params::UNPATCHED_MB_COMPRESSOR_RELEASE,
+	                                       writeAutomation, true, valuesForOverride);
+	unpatchedParams->writeParamAsAttribute(writer, "mbCompressorSkew", params::UNPATCHED_MB_COMPRESSOR_SKEW,
+	                                       writeAutomation, true, valuesForOverride);
+	unpatchedParams->writeParamAsAttribute(writer, "mbCompressorLowLevel", params::UNPATCHED_MB_COMPRESSOR_LOW_LEVEL,
+	                                       writeAutomation, true, valuesForOverride);
+	unpatchedParams->writeParamAsAttribute(writer, "mbCompressorMidLevel", params::UNPATCHED_MB_COMPRESSOR_MID_LEVEL,
+	                                       writeAutomation, true, valuesForOverride);
+	unpatchedParams->writeParamAsAttribute(writer, "mbCompressorHighLevel", params::UNPATCHED_MB_COMPRESSOR_HIGH_LEVEL,
+	                                       writeAutomation, true, valuesForOverride);
+	unpatchedParams->writeParamAsAttribute(writer, "mbCompressorOutputGain",
+	                                       params::UNPATCHED_MB_COMPRESSOR_OUTPUT_GAIN, writeAutomation, true,
+	                                       valuesForOverride);
+	unpatchedParams->writeParamAsAttribute(writer, "mbCompressorVibe", params::UNPATCHED_MB_COMPRESSOR_VIBE,
+	                                       writeAutomation, true, valuesForOverride);
+	unpatchedParams->writeParamAsAttribute(writer, "mbCompressorBlend", params::UNPATCHED_MB_COMPRESSOR_BLEND,
+	                                       writeAutomation, true, valuesForOverride);
 
 	unpatchedParams->writeParamAsAttribute(writer, "arpeggiatorGate", params::UNPATCHED_ARP_GATE, writeAutomation);
 	unpatchedParams->writeParamAsAttribute(writer, "noteProbability", params::UNPATCHED_NOTE_PROBABILITY,
@@ -700,6 +735,83 @@ bool ModControllableAudio::readParamTagFromFile(Deserializer& reader, char const
 		unpatchedParams->readParam(reader, unpatchedParamsSummary, params::UNPATCHED_COMPRESSOR_THRESHOLD,
 		                           readAutomationUpToPos);
 		reader.exitTag("compressorThreshold");
+	}
+
+	// Multiband compressor params
+	else if (!strcmp(tagName, "mbCompressorCharacter")) {
+		unpatchedParams->readParam(reader, unpatchedParamsSummary, params::UNPATCHED_MB_COMPRESSOR_CHARACTER,
+		                           readAutomationUpToPos);
+		reader.exitTag("mbCompressorCharacter");
+	}
+	else if (!strcmp(tagName, "mbCompressorLowCrossover")) {
+		unpatchedParams->readParam(reader, unpatchedParamsSummary, params::UNPATCHED_MB_COMPRESSOR_LOW_CROSSOVER,
+		                           readAutomationUpToPos);
+		reader.exitTag("mbCompressorLowCrossover");
+	}
+	else if (!strcmp(tagName, "mbCompressorHighCrossover")) {
+		unpatchedParams->readParam(reader, unpatchedParamsSummary, params::UNPATCHED_MB_COMPRESSOR_HIGH_CROSSOVER,
+		                           readAutomationUpToPos);
+		reader.exitTag("mbCompressorHighCrossover");
+	}
+	else if (!strcmp(tagName, "mbCompressorThreshold")) {
+		unpatchedParams->readParam(reader, unpatchedParamsSummary, params::UNPATCHED_MB_COMPRESSOR_THRESHOLD,
+		                           readAutomationUpToPos);
+		reader.exitTag("mbCompressorThreshold");
+	}
+	else if (!strcmp(tagName, "mbCompressorRatio")) {
+		unpatchedParams->readParam(reader, unpatchedParamsSummary, params::UNPATCHED_MB_COMPRESSOR_RATIO,
+		                           readAutomationUpToPos);
+		reader.exitTag("mbCompressorRatio");
+	}
+	else if (!strcmp(tagName, "mbCompressorAttack")) {
+		unpatchedParams->readParam(reader, unpatchedParamsSummary, params::UNPATCHED_MB_COMPRESSOR_ATTACK,
+		                           readAutomationUpToPos);
+		reader.exitTag("mbCompressorAttack");
+	}
+	else if (!strcmp(tagName, "mbCompressorRelease")) {
+		unpatchedParams->readParam(reader, unpatchedParamsSummary, params::UNPATCHED_MB_COMPRESSOR_RELEASE,
+		                           readAutomationUpToPos);
+		reader.exitTag("mbCompressorRelease");
+	}
+	else if (!strcmp(tagName, "mbCompressorSkew")) {
+		unpatchedParams->readParam(reader, unpatchedParamsSummary, params::UNPATCHED_MB_COMPRESSOR_SKEW,
+		                           readAutomationUpToPos);
+		reader.exitTag("mbCompressorSkew");
+	}
+	else if (!strcmp(tagName, "mbCompressorLowLevel")) {
+		unpatchedParams->readParam(reader, unpatchedParamsSummary, params::UNPATCHED_MB_COMPRESSOR_LOW_LEVEL,
+		                           readAutomationUpToPos);
+		reader.exitTag("mbCompressorLowLevel");
+	}
+	else if (!strcmp(tagName, "mbCompressorMidLevel")) {
+		unpatchedParams->readParam(reader, unpatchedParamsSummary, params::UNPATCHED_MB_COMPRESSOR_MID_LEVEL,
+		                           readAutomationUpToPos);
+		reader.exitTag("mbCompressorMidLevel");
+	}
+	else if (!strcmp(tagName, "mbCompressorHighLevel")) {
+		unpatchedParams->readParam(reader, unpatchedParamsSummary, params::UNPATCHED_MB_COMPRESSOR_HIGH_LEVEL,
+		                           readAutomationUpToPos);
+		reader.exitTag("mbCompressorHighLevel");
+	}
+	else if (!strcmp(tagName, "mbCompressorOutputGain")) {
+		unpatchedParams->readParam(reader, unpatchedParamsSummary, params::UNPATCHED_MB_COMPRESSOR_OUTPUT_GAIN,
+		                           readAutomationUpToPos);
+		reader.exitTag("mbCompressorOutputGain");
+	}
+	else if (!strcmp(tagName, "mbCompressorVibe")) {
+		unpatchedParams->readParam(reader, unpatchedParamsSummary, params::UNPATCHED_MB_COMPRESSOR_VIBE,
+		                           readAutomationUpToPos);
+		reader.exitTag("mbCompressorVibe");
+	}
+	else if (!strcmp(tagName, "mbCompressorBlend")) {
+		unpatchedParams->readParam(reader, unpatchedParamsSummary, params::UNPATCHED_MB_COMPRESSOR_BLEND,
+		                           readAutomationUpToPos);
+		reader.exitTag("mbCompressorBlend");
+	}
+
+	// Multiband compressor state
+	else if (multibandCompressor.readTag(reader, tagName)) {
+		// Reading handled internally
 	}
 
 	// Arpeggiator stuff
