@@ -329,6 +329,36 @@ void MidiFollow::initDefaultMappings() {
 	ccToSoundParam[113] = params::UNPATCHED_START + params::UNPATCHED_ARP_GLIDE_PROBABILITY;
 	soundParamToCC[params::UNPATCHED_START + params::UNPATCHED_ARP_GLIDE_PROBABILITY] = 113;
 
+	// DOTT multiband compressor
+	ccToSoundParam[9] = params::UNPATCHED_START + params::UNPATCHED_MB_COMPRESSOR_CHARACTER;
+	soundParamToCC[params::UNPATCHED_START + params::UNPATCHED_MB_COMPRESSOR_CHARACTER] = 9;
+	ccToSoundParam[11] = params::UNPATCHED_START + params::UNPATCHED_MB_COMPRESSOR_VIBE;
+	soundParamToCC[params::UNPATCHED_START + params::UNPATCHED_MB_COMPRESSOR_VIBE] = 11;
+	ccToSoundParam[22] = params::UNPATCHED_START + params::UNPATCHED_MB_COMPRESSOR_BLEND;
+	soundParamToCC[params::UNPATCHED_START + params::UNPATCHED_MB_COMPRESSOR_BLEND] = 22;
+	ccToSoundParam[31] = params::UNPATCHED_START + params::UNPATCHED_MB_COMPRESSOR_OUTPUT_GAIN;
+	soundParamToCC[params::UNPATCHED_START + params::UNPATCHED_MB_COMPRESSOR_OUTPUT_GAIN] = 31;
+	ccToSoundParam[33] = params::UNPATCHED_START + params::UNPATCHED_MB_COMPRESSOR_THRESHOLD;
+	soundParamToCC[params::UNPATCHED_START + params::UNPATCHED_MB_COMPRESSOR_THRESHOLD] = 33;
+	ccToSoundParam[34] = params::UNPATCHED_START + params::UNPATCHED_MB_COMPRESSOR_RATIO;
+	soundParamToCC[params::UNPATCHED_START + params::UNPATCHED_MB_COMPRESSOR_RATIO] = 34;
+	ccToSoundParam[35] = params::UNPATCHED_START + params::UNPATCHED_MB_COMPRESSOR_ATTACK;
+	soundParamToCC[params::UNPATCHED_START + params::UNPATCHED_MB_COMPRESSOR_ATTACK] = 35;
+	ccToSoundParam[65] = params::UNPATCHED_START + params::UNPATCHED_MB_COMPRESSOR_RELEASE;
+	soundParamToCC[params::UNPATCHED_START + params::UNPATCHED_MB_COMPRESSOR_RELEASE] = 65;
+	ccToSoundParam[94] = params::UNPATCHED_START + params::UNPATCHED_MB_COMPRESSOR_LOW_CROSSOVER;
+	soundParamToCC[params::UNPATCHED_START + params::UNPATCHED_MB_COMPRESSOR_LOW_CROSSOVER] = 94;
+	ccToSoundParam[95] = params::UNPATCHED_START + params::UNPATCHED_MB_COMPRESSOR_HIGH_CROSSOVER;
+	soundParamToCC[params::UNPATCHED_START + params::UNPATCHED_MB_COMPRESSOR_HIGH_CROSSOVER] = 95;
+	ccToSoundParam[92] = params::UNPATCHED_START + params::UNPATCHED_MB_COMPRESSOR_SKEW;
+	soundParamToCC[params::UNPATCHED_START + params::UNPATCHED_MB_COMPRESSOR_SKEW] = 92;
+	ccToSoundParam[2] = params::UNPATCHED_START + params::UNPATCHED_MB_COMPRESSOR_LOW_LEVEL;
+	soundParamToCC[params::UNPATCHED_START + params::UNPATCHED_MB_COMPRESSOR_LOW_LEVEL] = 2;
+	ccToSoundParam[4] = params::UNPATCHED_START + params::UNPATCHED_MB_COMPRESSOR_MID_LEVEL;
+	soundParamToCC[params::UNPATCHED_START + params::UNPATCHED_MB_COMPRESSOR_MID_LEVEL] = 4;
+	ccToSoundParam[8] = params::UNPATCHED_START + params::UNPATCHED_MB_COMPRESSOR_HIGH_LEVEL;
+	soundParamToCC[params::UNPATCHED_START + params::UNPATCHED_MB_COMPRESSOR_HIGH_LEVEL] = 8;
+
 	// GLOBAL PARAMS
 	// NOTE: Here you add the global param, assigning the same CC as its relative sound param
 
@@ -384,6 +414,36 @@ void MidiFollow::initDefaultMappings() {
 	globalParamToCC[params::UNPATCHED_REVERB_SEND_AMOUNT] = 91;
 	ccToGlobalParam[93] = params::UNPATCHED_MOD_FX_DEPTH;
 	globalParamToCC[params::UNPATCHED_MOD_FX_DEPTH] = 93;
+
+	// DOTT multiband compressor (same CCs as the sound params)
+	ccToGlobalParam[9] = params::UNPATCHED_MB_COMPRESSOR_CHARACTER;
+	globalParamToCC[params::UNPATCHED_MB_COMPRESSOR_CHARACTER] = 9;
+	ccToGlobalParam[11] = params::UNPATCHED_MB_COMPRESSOR_VIBE;
+	globalParamToCC[params::UNPATCHED_MB_COMPRESSOR_VIBE] = 11;
+	ccToGlobalParam[22] = params::UNPATCHED_MB_COMPRESSOR_BLEND;
+	globalParamToCC[params::UNPATCHED_MB_COMPRESSOR_BLEND] = 22;
+	ccToGlobalParam[31] = params::UNPATCHED_MB_COMPRESSOR_OUTPUT_GAIN;
+	globalParamToCC[params::UNPATCHED_MB_COMPRESSOR_OUTPUT_GAIN] = 31;
+	ccToGlobalParam[33] = params::UNPATCHED_MB_COMPRESSOR_THRESHOLD;
+	globalParamToCC[params::UNPATCHED_MB_COMPRESSOR_THRESHOLD] = 33;
+	ccToGlobalParam[34] = params::UNPATCHED_MB_COMPRESSOR_RATIO;
+	globalParamToCC[params::UNPATCHED_MB_COMPRESSOR_RATIO] = 34;
+	ccToGlobalParam[35] = params::UNPATCHED_MB_COMPRESSOR_ATTACK;
+	globalParamToCC[params::UNPATCHED_MB_COMPRESSOR_ATTACK] = 35;
+	ccToGlobalParam[65] = params::UNPATCHED_MB_COMPRESSOR_RELEASE;
+	globalParamToCC[params::UNPATCHED_MB_COMPRESSOR_RELEASE] = 65;
+	ccToGlobalParam[94] = params::UNPATCHED_MB_COMPRESSOR_LOW_CROSSOVER;
+	globalParamToCC[params::UNPATCHED_MB_COMPRESSOR_LOW_CROSSOVER] = 94;
+	ccToGlobalParam[95] = params::UNPATCHED_MB_COMPRESSOR_HIGH_CROSSOVER;
+	globalParamToCC[params::UNPATCHED_MB_COMPRESSOR_HIGH_CROSSOVER] = 95;
+	ccToGlobalParam[92] = params::UNPATCHED_MB_COMPRESSOR_SKEW;
+	globalParamToCC[params::UNPATCHED_MB_COMPRESSOR_SKEW] = 92;
+	ccToGlobalParam[2] = params::UNPATCHED_MB_COMPRESSOR_LOW_LEVEL;
+	globalParamToCC[params::UNPATCHED_MB_COMPRESSOR_LOW_LEVEL] = 2;
+	ccToGlobalParam[4] = params::UNPATCHED_MB_COMPRESSOR_MID_LEVEL;
+	globalParamToCC[params::UNPATCHED_MB_COMPRESSOR_MID_LEVEL] = 4;
+	ccToGlobalParam[8] = params::UNPATCHED_MB_COMPRESSOR_HIGH_LEVEL;
+	globalParamToCC[params::UNPATCHED_MB_COMPRESSOR_HIGH_LEVEL] = 8;
 }
 
 /// checks to see if there is an active clip for the current context
