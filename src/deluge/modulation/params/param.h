@@ -182,10 +182,26 @@ enum UnpatchedShared : ParamType {
 	UNPATCHED_TREBLE_FREQ,
 	UNPATCHED_SAMPLE_RATE_REDUCTION,
 	UNPATCHED_BITCRUSHING,
+	UNPATCHED_SATURATION,
 	UNPATCHED_MOD_FX_OFFSET,
 	UNPATCHED_MOD_FX_FEEDBACK,
 	UNPATCHED_SIDECHAIN_SHAPE,
 	UNPATCHED_COMPRESSOR_THRESHOLD,
+	// Multiband compressor params
+	UNPATCHED_MB_COMPRESSOR_CHARACTER,
+	UNPATCHED_MB_COMPRESSOR_LOW_CROSSOVER,
+	UNPATCHED_MB_COMPRESSOR_HIGH_CROSSOVER,
+	UNPATCHED_MB_COMPRESSOR_THRESHOLD,
+	UNPATCHED_MB_COMPRESSOR_RATIO,
+	UNPATCHED_MB_COMPRESSOR_ATTACK,
+	UNPATCHED_MB_COMPRESSOR_RELEASE,
+	UNPATCHED_MB_COMPRESSOR_SKEW,
+	UNPATCHED_MB_COMPRESSOR_LOW_LEVEL,
+	UNPATCHED_MB_COMPRESSOR_MID_LEVEL,
+	UNPATCHED_MB_COMPRESSOR_HIGH_LEVEL,
+	UNPATCHED_MB_COMPRESSOR_OUTPUT_GAIN,
+	UNPATCHED_MB_COMPRESSOR_VIBE,
+	UNPATCHED_MB_COMPRESSOR_BLEND,
 	// Arp
 	UNPATCHED_FIRST_ARP_PARAM,
 	UNPATCHED_ARP_GATE = UNPATCHED_FIRST_ARP_PARAM,
@@ -211,8 +227,27 @@ enum UnpatchedShared : ParamType {
 /// Unpatched params which are only used for Sounds
 enum UnpatchedSound : ParamType {
 	UNPATCHED_PORTAMENTO = UNPATCHED_NUM_SHARED,
+	// The four macro automation lanes on synth tracks (the synth analog of the pseudo-CC macro
+	// lane params 128-131 on MIDI clips). Nothing in the render code reads them, so they are inert
+	// as sound params; the macro system mirrors its source into them and fans their automation out
+	// to the macro's target params. Their combined ids (UNPATCHED_START + index) must not
+	// be offered as macro target destinations - targets reach a macro lane only via the cascade ids.
+	UNPATCHED_MACRO_1,
+	UNPATCHED_MACRO_2,
+	UNPATCHED_MACRO_3,
+	UNPATCHED_MACRO_4,
+	UNPATCHED_LFO1_SYNC,
+	UNPATCHED_LFO2_SYNC,
+	UNPATCHED_LFO3_SYNC,
+	UNPATCHED_LFO4_SYNC,
 	UNPATCHED_SOUND_MAX_NUM,
 };
+
+/// Sound unpatched params double as macro-target destination bytes (UNPATCHED_START + id); ids at or above
+/// kMacroParamIDBase (176, modulation/macros/macros.h) - UNPATCHED_START would alias the macro
+/// cascade range in the SYNTH destination byte space.
+static_assert(UNPATCHED_START + UNPATCHED_SOUND_MAX_NUM <= 176,
+              "UnpatchedSound ids exceed macro destination byte space (see kMacroParamIDBase)");
 
 /// Just for GlobalEffectables
 enum UnpatchedGlobal : ParamType {
@@ -233,6 +268,16 @@ enum UnpatchedGlobal : ParamType {
 	UNPATCHED_SIDECHAIN_VOLUME,
 	UNPATCHED_PITCH_ADJUST,
 	UNPATCHED_TEMPO,
+	// The four macro automation lanes on GlobalEffectable tracks (audio clips and, later, kit-global).
+	// The GLOBAL-domain analog of UNPATCHED_MACRO_1..4 (sound) and the pseudo-CC lane params 128-131
+	// (MIDI). Nothing in the render code reads them, so they are inert as global params; the macro
+	// system mirrors its source into them and fans their automation out to the macro's target params.
+	// Their raw paramID bytes (43-46) must not be offered as macro target destinations - targets reach
+	// a macro lane only via the cascade ids.
+	UNPATCHED_GLOBAL_MACRO_1,
+	UNPATCHED_GLOBAL_MACRO_2,
+	UNPATCHED_GLOBAL_MACRO_3,
+	UNPATCHED_GLOBAL_MACRO_4,
 	UNPATCHED_GLOBAL_MAX_NUM,
 };
 
@@ -266,6 +311,7 @@ bool isParamPan(Kind kind, int32_t paramID);
 bool isParamPitch(Kind kind, int32_t paramID);
 bool isParamPitchBend(Kind kind, int32_t paramID);
 bool isParamArpRhythm(Kind kind, int32_t paramID);
+bool isParamLfoSync(Kind kind, int32_t paramID);
 bool isParamStutter(Kind kind, int32_t paramID);
 bool isParamQuantizedStutter(Kind kind, int32_t paramID, ModControllableAudio* modControllableAudio);
 
@@ -355,14 +401,14 @@ const uint32_t unpatchedNonGlobalParamShortcuts[kDisplayWidth][kDisplayHeight] =
     {kNoParamID          , kNoParamID, kNoParamID        , kNoParamID, kNoParamID                , kNoParamID                     , kNoParamID           , kNoParamID},
     {kNoParamID          , kNoParamID, kNoParamID        , kNoParamID, kNoParamID                , kNoParamID                     , kNoParamID           , kNoParamID},
     {kNoParamID          , kNoParamID, kNoParamID        , kNoParamID, kNoParamID                , kNoParamID                     , kNoParamID           , UNPATCHED_STUTTER_RATE},
-    {kNoParamID          , kNoParamID, kNoParamID        , kNoParamID, kNoParamID                , UNPATCHED_SAMPLE_RATE_REDUCTION, UNPATCHED_BITCRUSHING, kNoParamID},
+    {kNoParamID          , kNoParamID, kNoParamID        , kNoParamID, kNoParamID                , UNPATCHED_SAMPLE_RATE_REDUCTION, UNPATCHED_BITCRUSHING, UNPATCHED_SATURATION},
     {UNPATCHED_PORTAMENTO, kNoParamID, kNoParamID        , kNoParamID, kNoParamID                , UNPATCHED_COMPRESSOR_THRESHOLD , kNoParamID           , kNoParamID},
     {kNoParamID          , kNoParamID, kNoParamID        , kNoParamID, kNoParamID                , kNoParamID                     , kNoParamID           , kNoParamID},
     {kNoParamID          , kNoParamID, kNoParamID        , kNoParamID, kNoParamID                , kNoParamID                     , kNoParamID           , kNoParamID},
     {kNoParamID          , kNoParamID, kNoParamID        , kNoParamID, UNPATCHED_SIDECHAIN_SHAPE , kNoParamID                     , UNPATCHED_BASS       , UNPATCHED_BASS_FREQ},
     {kNoParamID          , kNoParamID, UNPATCHED_ARP_GATE, kNoParamID, kNoParamID                , kNoParamID                     , UNPATCHED_TREBLE     , UNPATCHED_TREBLE_FREQ},
-    {kNoParamID          , kNoParamID, kNoParamID        , kNoParamID, UNPATCHED_MOD_FX_OFFSET   , UNPATCHED_MOD_FX_FEEDBACK      , kNoParamID           , kNoParamID},
-    {kNoParamID          , kNoParamID, kNoParamID        , kNoParamID, kNoParamID                , kNoParamID                     , kNoParamID           , kNoParamID},
+    {kNoParamID          , UNPATCHED_LFO1_SYNC, UNPATCHED_LFO3_SYNC, kNoParamID, UNPATCHED_MOD_FX_OFFSET   , UNPATCHED_MOD_FX_FEEDBACK      , kNoParamID           , kNoParamID},
+    {kNoParamID          , UNPATCHED_LFO2_SYNC, UNPATCHED_LFO4_SYNC, kNoParamID, kNoParamID                , kNoParamID                     , kNoParamID           , kNoParamID},
     {kNoParamID          , kNoParamID, kNoParamID        , kNoParamID, kNoParamID                , kNoParamID                     , kNoParamID           , kNoParamID},
     {kNoParamID          , UNPATCHED_SPREAD_VELOCITY, kNoParamID        , kNoParamID, kNoParamID                , kNoParamID                     , kNoParamID           , kNoParamID}
 };
@@ -378,7 +424,7 @@ const uint32_t unpatchedGlobalParamShortcuts[kDisplayWidth][kDisplayHeight] = {
     {kNoParamID          , kNoParamID            , kNoParamID                , kNoParamID                  , kNoParamID				   , kNoParamID			   		 	, kNoParamID            , kNoParamID},
     {kNoParamID          , kNoParamID            , kNoParamID                , kNoParamID                  , kNoParamID				   , kNoParamID			   		 	, kNoParamID            , kNoParamID},
     {kNoParamID          , kNoParamID            , kNoParamID                , kNoParamID                  , kNoParamID				   , kNoParamID			   		 	, kNoParamID            , UNPATCHED_STUTTER_RATE},
-    {UNPATCHED_VOLUME    , UNPATCHED_PITCH_ADJUST, kNoParamID                , UNPATCHED_PAN               , kNoParamID				   , UNPATCHED_SAMPLE_RATE_REDUCTION, UNPATCHED_BITCRUSHING , kNoParamID},
+    {UNPATCHED_VOLUME    , UNPATCHED_PITCH_ADJUST, kNoParamID                , UNPATCHED_PAN               , kNoParamID				   , UNPATCHED_SAMPLE_RATE_REDUCTION, UNPATCHED_BITCRUSHING , UNPATCHED_SATURATION},
     {kNoParamID          , kNoParamID            , kNoParamID                , kNoParamID                  , kNoParamID				   , UNPATCHED_COMPRESSOR_THRESHOLD	, kNoParamID            , kNoParamID},
     {kNoParamID          , kNoParamID            , kNoParamID                , kNoParamID                  , UNPATCHED_LPF_MORPH	   , kNoParamID						, UNPATCHED_LPF_RES     , UNPATCHED_LPF_FREQ},
     {kNoParamID          , kNoParamID            , kNoParamID                , kNoParamID                  , UNPATCHED_HPF_MORPH	   , kNoParamID						, UNPATCHED_HPF_RES     , UNPATCHED_HPF_FREQ},
@@ -391,4 +437,48 @@ const uint32_t unpatchedGlobalParamShortcuts[kDisplayWidth][kDisplayHeight] = {
 // clang-format on
 
 uint32_t expressionParamFromShortcut(int x, int y);
+
+/// Zone param metadata for zone-based menu items (DOTT multiband compressor)
+struct ZoneParamInfo {
+	int32_t zoneCount;
+	int32_t resolution;
+};
+
+/// Get zone param info for patched params. No patched zone params exist in this port
+/// (owlet's scatter system has them); the overload exists for the zone_based.h templates.
+constexpr ZoneParamInfo getZoneParamInfo(ParamType paramId) {
+	return {1, 128};
+}
+
+/// Get the unpatched fallback param for a patched param (-1 if none). Always -1 in this port;
+/// see getZoneParamInfo(ParamType).
+constexpr int32_t getUnpatchedFallback(ParamType patchedId) {
+	return -1;
+}
+
+/// Get zone param info for unpatched params
+constexpr ZoneParamInfo getZoneParamInfo(UnpatchedShared paramId) {
+	switch (paramId) {
+	case UNPATCHED_MB_COMPRESSOR_CHARACTER:
+	case UNPATCHED_MB_COMPRESSOR_VIBE:
+		return {8, 1024}; // 8 zones for DOTT character/vibe
+	default:
+		return {1, 128}; // Default non-zone param
+	}
+}
+
+/// Check if an unpatched param is a high-resolution zone param (1024+ steps)
+/// Used by gold knob to apply finer control for these params
+constexpr bool isHighResZoneParam(UnpatchedShared paramId) {
+	auto info = getZoneParamInfo(paramId);
+	return info.resolution >= 1024;
+}
+
+/// Get resolution divisor for high-res params (how much to divide gold knob offset)
+/// Returns 1 for standard params, higher values for zone params (e.g., 8 for 1024-step)
+constexpr int32_t getHighResOffsetDivisor(UnpatchedShared paramId) {
+	auto info = getZoneParamInfo(paramId);
+	return info.resolution / 128;
+}
+
 } // namespace deluge::modulation::params

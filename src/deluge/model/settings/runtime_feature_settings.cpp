@@ -200,6 +200,16 @@ void RuntimeFeatureSettings::init() {
 	SetupOnOffSetting(settings[RuntimeFeatureSettingType::ShowBatteryLevel],
 	                  STRING_FOR_COMMUNITY_FEATURE_SHOW_BATTERY_LEVEL, "showBatteryLevel",
 	                  RuntimeFeatureStateToggle::On);
+	// macro
+	SetupOnOffSetting(settings[RuntimeFeatureSettingType::MacroSystem], STRING_FOR_COMMUNITY_FEATURE_MACROS, "macros",
+	                  RuntimeFeatureStateToggle::Off);
+
+	// Filter Frequency Display
+	SetupOnOffSetting(settings[RuntimeFeatureSettingType::ShowRealUnits], STRING_FOR_COMMUNITY_FEATURE_SHOW_REAL_UNITS,
+	                  "showRealUnits", RuntimeFeatureStateToggle::Off);
+	// ModFX after DOTT (post multiband compressor)
+	SetupOnOffSetting(settings[RuntimeFeatureSettingType::ModFXPostDOTT], STRING_FOR_COMMUNITY_FEATURE_MODFX_POST_DOTT,
+	                  "modFxPostDott", RuntimeFeatureStateToggle::Off);
 }
 
 void RuntimeFeatureSettings::readSettingsFromFile() {
