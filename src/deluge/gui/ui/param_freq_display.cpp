@@ -18,6 +18,7 @@
 #include "gui/ui/param_freq_display.h"
 
 #include "definitions_cxx.hpp"
+#include "dsp/fast_math.h"
 #include "gui/views/view.h"
 #include "hid/display/oled.h"
 #include "model/clip/instrument_clip.h"
@@ -72,6 +73,12 @@ enum class FreqParam {
 	ENV_RELEASE,
 	DELAY_RATE_PATCHED,
 	DELAY_RATE_GLOBAL,
+	MB_LOW_CROSSOVER,
+	MB_HIGH_CROSSOVER,
+	MB_ATTACK,
+	MB_RELEASE,
+	MB_BAND_LEVEL,
+	MB_OUTPUT_GAIN,
 };
 
 enum class Unit { HZ, SECONDS, DECIBELS };
@@ -116,6 +123,25 @@ FreqParam identify(params::Kind kind, int32_t paramID) {
 		}
 		if (paramID == params::UNPATCHED_BASS || paramID == params::UNPATCHED_TREBLE) {
 			return FreqParam::EQ_GAIN;
+		}
+		if (paramID == params::UNPATCHED_MB_COMPRESSOR_LOW_CROSSOVER) {
+			return FreqParam::MB_LOW_CROSSOVER;
+		}
+		if (paramID == params::UNPATCHED_MB_COMPRESSOR_HIGH_CROSSOVER) {
+			return FreqParam::MB_HIGH_CROSSOVER;
+		}
+		if (paramID == params::UNPATCHED_MB_COMPRESSOR_ATTACK) {
+			return FreqParam::MB_ATTACK;
+		}
+		if (paramID == params::UNPATCHED_MB_COMPRESSOR_RELEASE) {
+			return FreqParam::MB_RELEASE;
+		}
+		if (paramID == params::UNPATCHED_MB_COMPRESSOR_LOW_LEVEL || paramID == params::UNPATCHED_MB_COMPRESSOR_MID_LEVEL
+		    || paramID == params::UNPATCHED_MB_COMPRESSOR_HIGH_LEVEL) {
+			return FreqParam::MB_BAND_LEVEL;
+		}
+		if (paramID == params::UNPATCHED_MB_COMPRESSOR_OUTPUT_GAIN) {
+			return FreqParam::MB_OUTPUT_GAIN;
 		}
 		// Ids below exist only in the GlobalEffectable section and would collide with sound-only
 		// unpatched ids, so require the GLOBAL kind for them
@@ -261,6 +287,55 @@ float computeValue(FreqParam which, float paramValue, Unit& unit) {
 		float samples = std::clamp(274877906944.0f / rate, 1.0f, 88200.0f);
 		unit = Unit::SECONDS;
 		return samples / (float)kSampleRate;
+	}
+	case FreqParam::MB_LOW_CROSSOVER:
+		// DOTT crossovers (mod_controllable_audio.cpp applyMultibandCompressorParams):
+		// freq = min * (max/min)^(value/2^31); both ranges span 40x (50-2000 Hz low, 200-8000 Hz
+		// high), and values below zero (reachable via CC/knob) sweep on below the nominal minimum
+		return 50.0f * std::pow(40.0f, paramValue / kQ31);
+	case FreqParam::MB_HIGH_CROSSOVER: {
+		float highHz = 200.0f * std::pow(40.0f, paramValue / kQ31);
+		// The DSP keeps the high crossover at least 100 Hz above the low one, so show the
+		// effective frequency, not the dialed target the clamp would override
+		ParamManager* paramManager = view.activeModControllableModelStack.paramManager;
+		if (paramManager != nullptr && paramManager->containsAnyParamCollectionsIncludingExpression()) {
+			q31_t lowValue =
+			    paramManager->getUnpatchedParamSet()->getValue(params::UNPATCHED_MB_COMPRESSOR_LOW_CROSSOVER);
+			float lowHz = 50.0f * std::pow(40.0f, (float)lowValue / kQ31);
+			highHz = std::max(highHz, lowHz + 100.0f);
+		}
+		return highHz;
+	}
+	case FreqParam::MB_ATTACK:
+	case FreqParam::MB_RELEASE: {
+		// DOTT band envelopes (dsp/compressor/multiband.h setAttack/setRelease): ms = base +
+		// (fastExp(2v/2^31) - 1) * scale, attack 0.5-96 ms, release 5-484 ms; same fastExp as the
+		// DSP so this matches the menu's readout exactly
+		float curve = deluge::dsp::fastExp(2.0f * paramValue / kQ31) - 1.0f;
+		unit = Unit::SECONDS;
+		float ms = (which == FreqParam::MB_ATTACK) ? 0.5f + curve * 15.0f : 5.0f + curve * 75.0f;
+		return ms / 1000.0f;
+	}
+	case FreqParam::MB_BAND_LEVEL:
+	case FreqParam::MB_OUTPUT_GAIN: {
+		// DOTT gains (dsp/compressor/multiband.h setOutputLevel/setOutputGain): piecewise-linear
+		// amplitude, lower half 0x-1x (-inf to 0 dB, unity at centre), upper half 1x-10x for band
+		// levels (+20 dB) or 1x-6.31x for output gain (+16 dB). Below-zero param values flip the
+		// signal's phase in the DSP; floored to -inf here rather than shown as a magnitude
+		unit = Unit::DECIBELS;
+		float normalized = paramValue / kQ31;
+		float linear;
+		if (normalized <= 0.5f) {
+			linear = normalized * 2.0f;
+		}
+		else {
+			float span = (which == FreqParam::MB_BAND_LEVEL) ? 9.0f : 5.31f;
+			linear = 1.0f + (normalized - 0.5f) * 2.0f * span;
+		}
+		if (linear <= 0.0f) {
+			return -1000.0f; // -inf dB
+		}
+		return 20.0f * std::log10(linear);
 	}
 	case FreqParam::ENV_DECAY:
 	case FreqParam::ENV_RELEASE: {
