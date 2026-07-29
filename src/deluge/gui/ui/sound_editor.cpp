@@ -2098,6 +2098,11 @@ std::optional<std::span<HorizontalMenu* const>> SoundEditor::getCurrentHorizonta
 	if (!rootUIIsClipMinderScreen()) {
 		return horizontalMenusChainForSong;
 	}
+	// FX clips edit the song-master FX chain, so they get the song horizontal menus - their param
+	// shortcuts are the song-view menu items, which only the song chain contains
+	if (Clip* clip = getCurrentClip(); clip != nullptr && clip->type == ClipType::FX) {
+		return horizontalMenusChainForSong;
+	}
 	if (editingKitAffectEntire()) {
 		return horizontalMenusChainForKit;
 	}
