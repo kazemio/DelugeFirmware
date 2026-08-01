@@ -1623,6 +1623,7 @@ void ArpeggiatorSettings::cloneFrom(ArpeggiatorSettings const* other) {
 	numStepRepeats = other->numStepRepeats;
 	includeInKitArp = other->includeInKitArp;
 	randomizerLock = other->randomizerLock;
+	midiInterceptArp = other->midiInterceptArp;
 	syncType = other->syncType;
 	syncLevel = other->syncLevel;
 	mpeVelocity = other->mpeVelocity;
@@ -1836,6 +1837,9 @@ bool ArpeggiatorSettings::readNonAudioTagsFromFile(Deserializer& reader, char co
 	else if (!strcmp(tagName, "spreadOctave")) {
 		spreadOctave = reader.readTagOrAttributeValueInt();
 	}
+	else if (!strcmp(tagName, "midiInterceptArp")) {
+		midiInterceptArp = reader.readTagOrAttributeValueInt();
+	}
 	else {
 		return false;
 	}
@@ -1933,6 +1937,7 @@ void ArpeggiatorSettings::writeNonAudioParamsToFile(Serializer& writer) {
 	writer.writeAttribute("spreadVelocity", spreadVelocity);
 	writer.writeAttribute("spreadGate", spreadGate);
 	writer.writeAttribute("spreadOctave", spreadOctave);
+	writer.writeAttribute("midiInterceptArp", midiInterceptArp);
 }
 
 void ArpeggiatorSettings::generateNewNotePattern() {
@@ -1980,6 +1985,70 @@ void ArpeggiatorSettings::updateParamsFromUnpatchedParamSet(UnpatchedParamSet* u
 	spreadVelocity = (uint32_t)unpatchedParams->getValue(params::UNPATCHED_SPREAD_VELOCITY) + 2147483648;
 	spreadGate = (uint32_t)unpatchedParams->getValue(params::UNPATCHED_ARP_SPREAD_GATE) + 2147483648;
 	spreadOctave = (uint32_t)unpatchedParams->getValue(params::UNPATCHED_ARP_SPREAD_OCTAVE) + 2147483648;
+}
+
+bool ArpeggiatorSettings::trySetArpParamFromMidiCC(int32_t soundParamId, int32_t ccValue) {
+	// Map the incoming 0-127 CC value onto the 0-50 menu range these settings are edited with, then reuse the same
+	// scaling helpers the MIDI/CV arp menus use so an intercepted knob behaves exactly like editing the menu (jump
+	// takeover). Standard scaling for rate/gate, unsigned scaling for everything else.
+	int32_t menuValue = (ccValue * kMaxMenuValue + kMaxMIDIValue / 2) / kMaxMIDIValue;
+	int32_t standardValue = computeFinalValueForStandardMenuItem(menuValue);
+	uint32_t unsignedValue = computeFinalValueForUnsignedMenuItem(menuValue);
+
+	switch (soundParamId) {
+	case params::GLOBAL_ARP_RATE:
+		rate = standardValue;
+		break;
+	case params::UNPATCHED_START + params::UNPATCHED_ARP_GATE:
+		gate = standardValue;
+		break;
+	case params::UNPATCHED_START + params::UNPATCHED_ARP_RHYTHM:
+		rhythm = unsignedValue;
+		break;
+	case params::UNPATCHED_START + params::UNPATCHED_ARP_SEQUENCE_LENGTH:
+		sequenceLength = unsignedValue;
+		break;
+	case params::UNPATCHED_START + params::UNPATCHED_ARP_CHORD_POLYPHONY:
+		chordPolyphony = unsignedValue;
+		break;
+	case params::UNPATCHED_START + params::UNPATCHED_ARP_RATCHET_AMOUNT:
+		ratchetAmount = unsignedValue;
+		break;
+	case params::UNPATCHED_START + params::UNPATCHED_NOTE_PROBABILITY:
+		noteProbability = unsignedValue;
+		break;
+	case params::UNPATCHED_START + params::UNPATCHED_REVERSE_PROBABILITY:
+		reverseProbability = unsignedValue;
+		break;
+	case params::UNPATCHED_START + params::UNPATCHED_ARP_BASS_PROBABILITY:
+		bassProbability = unsignedValue;
+		break;
+	case params::UNPATCHED_START + params::UNPATCHED_ARP_SWAP_PROBABILITY:
+		swapProbability = unsignedValue;
+		break;
+	case params::UNPATCHED_START + params::UNPATCHED_ARP_GLIDE_PROBABILITY:
+		glideProbability = unsignedValue;
+		break;
+	case params::UNPATCHED_START + params::UNPATCHED_ARP_CHORD_PROBABILITY:
+		chordProbability = unsignedValue;
+		break;
+	case params::UNPATCHED_START + params::UNPATCHED_ARP_RATCHET_PROBABILITY:
+		ratchetProbability = unsignedValue;
+		break;
+	case params::UNPATCHED_START + params::UNPATCHED_SPREAD_VELOCITY:
+		spreadVelocity = unsignedValue;
+		break;
+	case params::UNPATCHED_START + params::UNPATCHED_ARP_SPREAD_GATE:
+		spreadGate = unsignedValue;
+		break;
+	case params::UNPATCHED_START + params::UNPATCHED_ARP_SPREAD_OCTAVE:
+		spreadOctave = unsignedValue;
+		break;
+	default:
+		// Not an arp param we handle - leave it to be passed through to the external instrument.
+		return false;
+	}
+	return true;
 }
 
 void ArpeggiatorSettings::updateSettingsFromCurrentPreset() {

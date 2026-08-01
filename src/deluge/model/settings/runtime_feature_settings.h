@@ -66,6 +66,9 @@ enum RuntimeFeatureSettingType : uint32_t {
 	HorizontalMenus,
 	TrimFromStartOfAudioClip,
 	ShowBatteryLevel,
+	MacroSystem,
+	ShowRealUnits,
+	ModFXPostDOTT,
 	MaxElement // Keep as boundary
 };
 
