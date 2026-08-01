@@ -20,6 +20,7 @@
 #include "definitions_cxx.hpp"
 #include "deluge/dsp/granular/GranularProcessor.h"
 #include "deluge/model/settings/runtime_feature_settings.h"
+#include "dsp/spectrum/spectrum_analyzer.h"
 #include "dsp/stereo_sample.h"
 #include "gui/l10n/l10n.h"
 #include "gui/ui/ui.h"
@@ -83,6 +84,9 @@ ModControllableAudio::ModControllableAudio() {
 }
 
 ModControllableAudio::~ModControllableAudio() {
+	// Covers every deletion path, including song swap while the SPECTRUM screen is open, where the
+	// UIs get nullified without endSession() ever firing.
+	spectrumAnalyzer.clearIfTarget(this);
 	// delay.discardBuffers(); // No! The DelayBuffers will themselves destruct and do this
 	delete grainFX;
 }

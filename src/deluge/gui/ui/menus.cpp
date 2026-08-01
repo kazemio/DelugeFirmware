@@ -201,6 +201,7 @@
 #include "gui/menu_item/song/midi_learn.h"
 #include "gui/menu_item/source/patched_param/modulator_feedback.h"
 #include "gui/menu_item/source/patched_param/modulator_level.h"
+#include "gui/menu_item/spectrum/analyzer.h"
 #include "gui/menu_item/stem_export/start.h"
 #include "gui/menu_item/stutter/direction.h"
 #include "gui/menu_item/stutter/quantized.h"
@@ -994,6 +995,8 @@ firmware::Version firmwareVersionMenu{STRING_FOR_FIRMWARE_VERSION, STRING_FOR_FI
 
 battery::Level batteryLevelMenu{STRING_FOR_BATTERY_LEVEL, STRING_FOR_BATTERY_LEVEL_MENU_TITLE};
 
+spectrum::Analyzer spectrumAnalyzerMenu{STRING_FOR_SPECTRUM, STRING_FOR_SPECTRUM};
+
 runtime_feature::Settings runtimeFeatureSettingsMenu{STRING_FOR_COMMUNITY_FTS, STRING_FOR_COMMUNITY_FTS_MENU_TITLE};
 
 // CV menu
@@ -1468,6 +1471,7 @@ Submenu soundEditorRootMenu{
         &patchCablesMenu,
         &sequenceDirectionMenu,
         &outputMidiSubmenu,
+        &spectrumAnalyzerMenu,
     },
 };
 
@@ -1622,6 +1626,7 @@ menu_item::Submenu soundEditorRootMenuAudioClip{
         &audioClipSampleMenu,
         &audioClipAttackMenu,
         &priorityMenu,
+        &spectrumAnalyzerMenu,
     },
 };
 
@@ -1716,6 +1721,7 @@ menu_item::Submenu soundEditorRootMenuSongView{
         &configureSongMacrosMenu,
         &midiLearnMenu,
         &stemExportMenu,
+        &spectrumAnalyzerMenu,
     },
 };
 
@@ -1737,6 +1743,7 @@ menu_item::Submenu soundEditorRootMenuKitGlobalFX{
         &globalFiltersMenu,
         &globalFXMenu,
         &globalSidechainMenu,
+        &spectrumAnalyzerMenu,
     },
 };
 
