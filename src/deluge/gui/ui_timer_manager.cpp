@@ -19,6 +19,7 @@
 #include "definitions_cxx.hpp"
 #include "gui/ui/keyboard/keyboard_screen.h"
 #include "gui/ui/sound_editor.h"
+#include "gui/ui/spectrum_overlay.h"
 #include "gui/views/automation_view.h"
 #include "gui/views/instrument_clip_view.h"
 #include "gui/views/performance_view.h"
@@ -138,6 +139,10 @@ void UITimerManager::routine() {
 
 				case TimerName::SELECTED_CLIP_PULSE:
 					sessionView.gridPulseSelectedClip();
+					break;
+
+				case TimerName::SPECTRUM_OVERLAY:
+					deluge::gui::spectrum_overlay::timerEvent();
 					break;
 
 				case TimerName::MATRIX_DRIVER:

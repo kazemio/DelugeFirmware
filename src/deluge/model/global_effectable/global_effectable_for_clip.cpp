@@ -18,6 +18,7 @@
 #include "model/global_effectable/global_effectable_for_clip.h"
 #include "definitions.h"
 #include "definitions_cxx.hpp"
+#include "dsp/spectrum/spectrum_analyzer.h"
 #include "dsp/stereo_sample.h"
 #include "gui/l10n/l10n.h"
 #include "gui/views/view.h"
@@ -152,6 +153,8 @@ GlobalEffectableForClip::GlobalEffectableForClip() {
 	else {
 		compressor.reset();
 	}
+
+	spectrumAnalyzer.maybeFeed(this, global_effectable_audio);
 
 	// Add the global effectable data to the output
 	std::ranges::transform(global_effectable_audio, output, output.begin(), std::plus{});

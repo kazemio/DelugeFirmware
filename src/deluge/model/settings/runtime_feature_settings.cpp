@@ -200,6 +200,11 @@ void RuntimeFeatureSettings::init() {
 	SetupOnOffSetting(settings[RuntimeFeatureSettingType::ShowBatteryLevel],
 	                  STRING_FOR_COMMUNITY_FEATURE_SHOW_BATTERY_LEVEL, "showBatteryLevel",
 	                  RuntimeFeatureStateToggle::On);
+
+	// Spectrum Analyzer
+	SetupOnOffSetting(settings[RuntimeFeatureSettingType::EnableSpectrumAnalyzer],
+	                  STRING_FOR_COMMUNITY_FEATURE_SPECTRUM_ANALYZER, "enableSpectrumAnalyzer",
+	                  RuntimeFeatureStateToggle::On);
 }
 
 void RuntimeFeatureSettings::readSettingsFromFile() {
