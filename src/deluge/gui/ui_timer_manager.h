@@ -48,6 +48,7 @@ enum class TimerName {
 	NOTE_ROW_BLINK,
 	LOADING_ANIMATION,
 	SELECTED_CLIP_PULSE,
+	SPECTRUM_OVERLAY,
 	/// Total number of timers
 	NUM_TIMERS
 };
