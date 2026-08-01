@@ -47,6 +47,11 @@ ModControllableAudio* contextTarget() {
 		return nullptr;
 	}
 	if (rootUIIsClipMinderScreen()) {
+		// FX clips are master-FX scenes and render no audio of their own - show the song master.
+		Clip* currentClip = getCurrentClip();
+		if (currentClip != nullptr && currentClip->type == ClipType::FX) {
+			return &currentSong->globalEffectable;
+		}
 		Output* output = getCurrentOutput();
 		if (output != nullptr) {
 			// Kits follow AFFECT ENTIRE like the rest of the UI: with it off, analyze just the

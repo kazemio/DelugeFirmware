@@ -1847,6 +1847,7 @@ menu_item::Submenu soundEditorRootMenuFXClip{
         &globalFiltersMenu,
         &globalFXMenu,
         &macrosMenu,
+        &spectrumAnalyzerMenu,
     },
 };
 
