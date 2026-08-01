@@ -32,6 +32,8 @@ public:
 	void resetFilter() {
 		l = (SVFState){0, 0};
 		r = (SVFState){0, 0};
+		l2 = (SVFState){0, 0};
+		r2 = (SVFState){0, 0};
 	}
 
 private:
@@ -42,6 +44,9 @@ private:
 	[[gnu::always_inline]] inline q31_t doSVF(q31_t input, SVFState& state);
 	SVFState l;
 	SVFState r;
+	// second stage, used only in SVF_HP24 mode (two highpasses in series = 24dB/oct)
+	SVFState l2;
+	SVFState r2;
 
 	q31_t q;
 	q31_t in;
@@ -50,5 +55,6 @@ private:
 	q31_t c_notch;
 	q31_t c_high;
 	bool band_mode;
+	bool hp24_mode;
 };
 } // namespace deluge::dsp::filter

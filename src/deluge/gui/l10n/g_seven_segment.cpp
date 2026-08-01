@@ -105,6 +105,7 @@ PLACE_SDRAM_DATA Language seven_segment{
         {STRING_FOR_SVF_BAND, "SV_B"},
         {STRING_FOR_SVF_NOTCH, "SV_N"},
         {STRING_FOR_HPLADDER, "HP_L"},
+        {STRING_FOR_24DB_SVF, "HP24"},
         {STRING_FOR_12DB_LADDER, "LA12"},
         {STRING_FOR_24DB_LADDER, "LA24"},
         {STRING_FOR_FAST, "FAST"},
