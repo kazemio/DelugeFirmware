@@ -69,6 +69,7 @@ enum RuntimeFeatureSettingType : uint32_t {
 	MacroSystem,
 	ShowRealUnits,
 	ModFXPostDOTT,
+	EnableSpectrumAnalyzer,
 	MaxElement // Keep as boundary
 };
 

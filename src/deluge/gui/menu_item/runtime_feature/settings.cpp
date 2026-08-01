@@ -53,6 +53,7 @@ SettingToggle menuShowBatteryLevel(RuntimeFeatureSettingType::ShowBatteryLevel);
 SettingToggle menuMacros(RuntimeFeatureSettingType::MacroSystem);
 SettingToggle menuShowRealUnits(RuntimeFeatureSettingType::ShowRealUnits);
 SettingToggle menuModFXPostDOTT(RuntimeFeatureSettingType::ModFXPostDOTT);
+SettingToggle menuSpectrumAnalyzer(RuntimeFeatureSettingType::EnableSpectrumAnalyzer);
 
 std::array<MenuItem*, RuntimeFeatureSettingType::MaxElement - kNonTopLevelSettings> subMenuEntries{
     &menuDrumRandomizer,
@@ -80,7 +81,8 @@ std::array<MenuItem*, RuntimeFeatureSettingType::MaxElement - kNonTopLevelSettin
     &menuShowBatteryLevel,
     &menuMacros,
     &menuShowRealUnits,
-    &menuModFXPostDOTT};
+    &menuModFXPostDOTT,
+    &menuSpectrumAnalyzer};
 
 Settings::Settings(l10n::String name, l10n::String title) : menu_item::Submenu(name, title, subMenuEntries) {
 }

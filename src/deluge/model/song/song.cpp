@@ -18,6 +18,7 @@
 #include "model/song/song.h"
 #include "definitions_cxx.hpp"
 #include "dsp/reverb/reverb.hpp"
+#include "dsp/spectrum/spectrum_analyzer.h"
 #include "gui/l10n/l10n.h"
 #include "gui/ui/browser/browser.h"
 #include "gui/ui/load/load_instrument_preset_ui.h"
@@ -2563,6 +2564,8 @@ void Song::renderAudio(std::span<StereoSample> outputBuffer, int32_t* reverbBuff
 	globalEffectable.processReverbSendAndVolume(outputBuffer, reverbBuffer, volumePostFX, postReverbVolume,
 	                                            reverbSendAmount >> 1);
 	AudioEngine::logAction("done global effectables");
+
+	spectrumAnalyzer.maybeFeed(&globalEffectable, outputBuffer);
 
 	if (playbackHandler.isEitherClockActive() && !playbackHandler.ticksLeftInCountIn) {
 		// The Song's own paramManager only interpolates during arrangement playback (arranger master automation). An

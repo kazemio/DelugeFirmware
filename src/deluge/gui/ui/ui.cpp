@@ -15,7 +15,9 @@
  * If not, see <https://www.gnu.org/licenses/>.
  */
 
+#include "dsp/spectrum/spectrum_analyzer.h"
 #include "gui/ui/root_ui.h"
+#include "gui/ui/spectrum_overlay.h"
 #include "gui/ui_timer_manager.h"
 #include "gui/views/view.h"
 #include "hid/display/display.h"
@@ -368,16 +370,25 @@ void doAnyPendingGridRendering() {
 
 void doAnyPendingOLEDRendering() {
 	if (doesOLEDNeedRendering) {
-		int32_t u = numUIsOpen - 1;
-		while ((u > 0) && uiNavigationHierarchy[u]->oledShowsUIUnderneath) {
-			u--;
+		if (deluge::gui::spectrum_overlay::shouldShowSpectrum()) {
+			OLED::clearMainImage();
+			spectrumAnalyzer.renderToCanvas(deluge::hid::display::OLED::main);
 		}
+		else if (deluge::gui::spectrum_overlay::shouldBlankDisplay()) {
+			OLED::clearMainImage();
+		}
+		else {
+			int32_t u = numUIsOpen - 1;
+			while ((u > 0) && uiNavigationHierarchy[u]->oledShowsUIUnderneath) {
+				u--;
+			}
 
-		OLED::clearMainImage();
-		u = std::max(u, 0L);
-		for (; u < numUIsOpen; u++) {
-			OLED::stopScrollingAnimation();
-			uiNavigationHierarchy[u]->renderOLED(deluge::hid::display::OLED::main);
+			OLED::clearMainImage();
+			u = std::max(u, 0L);
+			for (; u < numUIsOpen; u++) {
+				OLED::stopScrollingAnimation();
+				uiNavigationHierarchy[u]->renderOLED(deluge::hid::display::OLED::main);
+			}
 		}
 
 		// Don't need to mark dirty because clearMainImage has already done that for us

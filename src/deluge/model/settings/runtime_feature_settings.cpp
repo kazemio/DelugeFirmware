@@ -210,6 +210,11 @@ void RuntimeFeatureSettings::init() {
 	// ModFX after DOTT (post multiband compressor)
 	SetupOnOffSetting(settings[RuntimeFeatureSettingType::ModFXPostDOTT], STRING_FOR_COMMUNITY_FEATURE_MODFX_POST_DOTT,
 	                  "modFxPostDott", RuntimeFeatureStateToggle::Off);
+
+	// Spectrum Analyzer
+	SetupOnOffSetting(settings[RuntimeFeatureSettingType::EnableSpectrumAnalyzer],
+	                  STRING_FOR_COMMUNITY_FEATURE_SPECTRUM_ANALYZER, "enableSpectrumAnalyzer",
+	                  RuntimeFeatureStateToggle::On);
 }
 
 void RuntimeFeatureSettings::readSettingsFromFile() {
