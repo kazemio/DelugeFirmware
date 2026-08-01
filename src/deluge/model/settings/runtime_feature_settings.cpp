@@ -204,6 +204,11 @@ void RuntimeFeatureSettings::init() {
 	// Rounded Corners
 	SetupOnOffSetting(settings[RuntimeFeatureSettingType::RoundedCorners], STRING_FOR_COMMUNITY_FEATURE_ROUNDED_CORNERS,
 	                  "roundedCorners", RuntimeFeatureStateToggle::On);
+
+	// Spectrum Analyzer
+	SetupOnOffSetting(settings[RuntimeFeatureSettingType::EnableSpectrumAnalyzer],
+	                  STRING_FOR_COMMUNITY_FEATURE_SPECTRUM_ANALYZER, "enableSpectrumAnalyzer",
+	                  RuntimeFeatureStateToggle::On);
 }
 
 void RuntimeFeatureSettings::factoryReset(bool showPopup) {
