@@ -20,7 +20,6 @@
 #include "definitions.h"
 #include "dsp/fft/fft_config_manager.h"
 #include "hid/display/oled_canvas/canvas.h"
-#include "processing/engines/audio_engine.h"
 #include "util/fixedpoint.h"
 #include "util/functions.h"
 #include "util/lookuptables/lookuptables.h"
@@ -123,9 +122,11 @@ void SpectrumAnalyzer::runFFTAndUpdateBars() {
 
 	decayBarsAndPeaks();
 
-	// If the target barely rendered since last frame (silent output skipping rendering, or the
-	// engine is struggling), skip the FFT and just let the bars fall.
-	if (samplesFed < kFFTSize / 4 || AudioEngine::cpuDireness >= 8) {
+	// If the target barely rendered since last frame (silent output skipping rendering), skip the
+	// FFT and just let the bars fall. No CPU-load gate: the whole analysis is well under 1ms per
+	// ~35ms frame and runs in a UI-priority task the scheduler won't start if audio is at risk -
+	// gating on cpuDireness made the display die exactly on the busy tracks it's most useful for.
+	if (samplesFed < kFFTSize / 4) {
 		return;
 	}
 
