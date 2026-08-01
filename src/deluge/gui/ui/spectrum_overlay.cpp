@@ -64,11 +64,18 @@ ModControllableAudio* contextTarget() {
 					return (SoundDrum*)kit->selectedDrum;
 				}
 			}
-			auto* modControllable = (ModControllableAudio*)output->toModControllable();
-			if (modControllable != nullptr) {
-				return modControllable;
+			// Only audio-producing outputs are ModControllableAudio (a MIDI/CV output's
+			// toModControllable() returns a plain ModControllable).
+			if (output->type == OutputType::SYNTH || output->type == OutputType::KIT
+			    || output->type == OutputType::AUDIO) {
+				auto* modControllable = (ModControllableAudio*)output->toModControllable();
+				if (modControllable != nullptr) {
+					return modControllable;
+				}
 			}
 		}
+		// MIDI/CV clips produce no audio of their own - show nothing rather than something unrelated.
+		return nullptr;
 	}
 	return &currentSong->globalEffectable;
 }

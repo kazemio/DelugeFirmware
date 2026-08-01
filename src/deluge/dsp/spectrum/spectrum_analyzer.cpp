@@ -99,6 +99,8 @@ void SpectrumAnalyzer::decayBarsAndPeaks() {
 
 void SpectrumAnalyzer::renderToCanvas(deluge::hid::display::oled_canvas::Canvas& canvas) const {
 	constexpr int32_t bottomY = OLED_MAIN_HEIGHT_PIXELS - 1;
+	// Always-visible baseline, so a silent spectrum is distinguishable from the display-off state.
+	canvas.drawHorizontalLine(bottomY, 0, OLED_MAIN_WIDTH_PIXELS - 1);
 	for (int32_t b = 0; b < kNumBars; b++) {
 		int32_t x = b * kBarPitchPx;
 		int32_t barHeight = barHeights_[b];
