@@ -1473,6 +1473,8 @@ char const* ModControllableAudio::getHPFModeDisplayName() {
 		return l10n::get(STRING_FOR_SVF_BAND);
 	case FilterMode::SVF_NOTCH:
 		return l10n::get(STRING_FOR_SVF_NOTCH);
+	case FilterMode::SVF_HP24:
+		return l10n::get(STRING_FOR_24DB_SVF);
 	default:
 		return l10n::get(STRING_FOR_NONE);
 	}
