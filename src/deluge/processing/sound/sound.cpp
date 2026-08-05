@@ -2490,6 +2490,9 @@ void Sound::render(ModelStackWithThreeMainThings* modelStack, std::span<StereoSa
 		    std::min(delayWorkingState.delayFeedbackAmount, (q31_t)(1 << 30) - (1 << 26));
 	}
 	delayWorkingState.userDelayRate = paramFinalValues[params::GLOBAL_DELAY_RATE - params::FIRST_GLOBAL];
+	delayWorkingState.sendAmount =
+	    (int32_t)(((uint32_t)paramManager->getUnpatchedParamSet()->getValue(params::UNPATCHED_DELAY_SEND) + 2147483648u)
+	              >> 1);
 	uint32_t timePerTickInverse = playbackHandler.getTimePerInternalTickInverse(true);
 	delay.setupWorkingState(delayWorkingState, timePerTickInverse, !voices_.empty());
 	delayWorkingState.analog_saturation = 8;

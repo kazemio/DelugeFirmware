@@ -496,6 +496,7 @@ patched_param::Integer delayRateMenu{STRING_FOR_RATE, STRING_FOR_DELAY_RATE, par
 delay::PingPong delayPingPongMenu{STRING_FOR_PINGPONG, STRING_FOR_DELAY_PINGPONG};
 delay::Analog delayAnalogMenu{STRING_FOR_TYPE, STRING_FOR_DELAY_TYPE};
 delay::Sync delaySyncMenu{STRING_FOR_SYNC, STRING_FOR_DELAY_SYNC};
+UnpatchedParam delaySendMenu{STRING_FOR_SEND, STRING_FOR_DELAY_SEND, params::UNPATCHED_DELAY_SEND, RenderingStyle::BAR};
 
 HorizontalMenu delayMenu{
     STRING_FOR_DELAY,
@@ -505,6 +506,7 @@ HorizontalMenu delayMenu{
         &delaySyncMenu,
         &delayRateMenu,
         &delayAnalogMenu,
+        &delaySendMenu,
     },
 };
 
@@ -738,6 +740,7 @@ HorizontalMenu globalDelayMenu{
         &delaySyncMenu,
         &globalDelayRateMenu,
         &delayAnalogMenu,
+        &delaySendMenu,
     },
 };
 
@@ -1778,7 +1781,7 @@ PLACE_SDRAM_DATA MenuItem* paramShortcutsForSounds[][kDisplayHeight] = {
     {&arpRateMenu,			&arpSyncMenu,				&arpGateMenu,                   &arpOctavesMenu,                &arpPresetModeMenu,		&nameEditMenu,				&trebleMenu,					&trebleFreqMenu                    },
     {&lfo1RateMenu,			&lfo1SyncMenu,				&lfo1TypeMenu,                  &modFXTypeMenu,                 &modFXOffsetMenu,		&modFXFeedbackMenu,			&modFXDepthMenu,				&modFXRateMenu                     },
     {&lfo2RateMenu,			&lfo2SyncMenu,				&lfo2TypeMenu,                  &reverbAmountMenu,              &reverbPanMenu,			&reverbWidthMenu,			&reverbDampingMenu,				&reverbRoomSizeMenu                },
-    {&delayRateMenu,			&delaySyncMenu,				&delayAnalogMenu,               &delayFeedbackMenu,             &delayPingPongMenu,		nullptr,					nullptr,						nullptr                            },
+    {&delayRateMenu,			&delaySyncMenu,				&delayAnalogMenu,               &delayFeedbackMenu,             &delayPingPongMenu,		&delaySendMenu,				nullptr,						nullptr                            },
     {nullptr,				&spreadVelocityMenu,		&randomizerLockMenu,            &randomizerNoteProbabilityMenu,        nullptr,				nullptr,					nullptr,						nullptr                            },
 };
 
@@ -1797,7 +1800,7 @@ PLACE_SDRAM_DATA MenuItem* paramShortcutsForSoundsSecondLayer[][kDisplayHeight] 
     {nullptr,	        nullptr,	            nullptr,	        nullptr,	        nullptr,					nullptr,	nullptr,	nullptr              },
     {&lfo3RateMenu,	    &lfo3SyncMenu,	        &lfo3TypeMenu,	    nullptr,	        nullptr,	                nullptr,	nullptr,	nullptr              },
     {&lfo4RateMenu,	    &lfo4SyncMenu,	        &lfo4TypeMenu,	    nullptr,	        nullptr,	                nullptr,	nullptr,	nullptr              },
-    {nullptr,	        nullptr,	            nullptr,	        nullptr,	        nullptr,                    nullptr,	nullptr,	nullptr              },
+    {nullptr,	        nullptr,	            nullptr,	        &delaySendMenu,	    nullptr,                    nullptr,	nullptr,	nullptr              },
     {nullptr,	        nullptr,	            nullptr,	        nullptr,	        nullptr,                    nullptr,	nullptr,	nullptr              },
 };
 
@@ -1816,7 +1819,7 @@ PLACE_SDRAM_DATA MenuItem* paramShortcutsForAudioClips[kDisplayWidth][kDisplayHe
     {nullptr,                 nullptr,                 nullptr,                    nullptr,                     nullptr,              &nameEditMenu,      &trebleMenu,              &trebleFreqMenu                    },
     {nullptr,                 nullptr,                 nullptr,                    &modFXTypeMenu,              &modFXOffsetMenu,     &modFXFeedbackMenu, &globalModFXDepthMenu,    &globalModFXRateMenu               },
     {nullptr,                 nullptr,                 nullptr,                    &globalReverbSendAmountMenu, &reverbPanMenu,       &reverbWidthMenu,   &reverbDampingMenu,       &reverbRoomSizeMenu                },
-    {&globalDelayRateMenu,    &delaySyncMenu,          &delayAnalogMenu,           &globalDelayFeedbackMenu,    &delayPingPongMenu,   nullptr,            nullptr,                  nullptr                            },
+    {&globalDelayRateMenu,    &delaySyncMenu,          &delayAnalogMenu,           &globalDelayFeedbackMenu,    &delayPingPongMenu,   &delaySendMenu,     nullptr,                  nullptr                            },
     {nullptr,                 nullptr,                 nullptr,                    nullptr,                     nullptr,              nullptr,            nullptr,                  nullptr                            },
 };
 
@@ -1835,7 +1838,7 @@ PLACE_SDRAM_DATA MenuItem* paramShortcutsForSongView[][kDisplayHeight] = {
     {nullptr,                 nullptr,                 nullptr,                        nullptr,                        nullptr,              nullptr,                &trebleMenu,              &trebleFreqMenu                    },
     {nullptr,                 nullptr,                 nullptr,                        &modFXTypeMenu,                 &modFXOffsetMenu,     &modFXFeedbackMenu,     &globalModFXDepthMenu,    &globalModFXRateMenu               },
     {nullptr,                 nullptr,                 nullptr,                        &globalReverbSendAmountMenu,    &reverbPanMenu,       &reverbWidthMenu,       &reverbDampingMenu,       &reverbRoomSizeMenu                },
-    {&globalDelayRateMenu,    &delaySyncMenu,          &delayAnalogMenu,               &globalDelayFeedbackMenu,       &delayPingPongMenu,   nullptr,                nullptr,                  nullptr                            },
+    {&globalDelayRateMenu,    &delaySyncMenu,          &delayAnalogMenu,               &globalDelayFeedbackMenu,       &delayPingPongMenu,   &delaySendMenu,         nullptr,                  nullptr                            },
     {nullptr,          	      nullptr,                 nullptr,                        nullptr,                        nullptr,              nullptr,                nullptr,                  nullptr                            },
 };
 
@@ -1854,7 +1857,7 @@ PLACE_SDRAM_DATA MenuItem* paramShortcutsForKitGlobalFX[][kDisplayHeight] = {
     {&arpRateMenu,            &arpSyncMenu,            &arpGateMenu,                   &arpOctavesMenu,                &arpPresetModeMenu,          &nameEditMenu,          &trebleMenu,              &trebleFreqMenu                    },
     {nullptr,                 nullptr,                 nullptr,                        &modFXTypeMenu,                 &modFXOffsetMenu,            &modFXFeedbackMenu,     &globalModFXDepthMenu,    &globalModFXRateMenu               },
     {nullptr,                 nullptr,                 nullptr,                        &globalReverbSendAmountMenu,    &reverbPanMenu,              &reverbWidthMenu,       &reverbDampingMenu,       &reverbRoomSizeMenu                },
-    {&globalDelayRateMenu,    &delaySyncMenu,          &delayAnalogMenu,               &globalDelayFeedbackMenu,       &delayPingPongMenu,          nullptr,                nullptr,                  nullptr                            },
+    {&globalDelayRateMenu,    &delaySyncMenu,          &delayAnalogMenu,               &globalDelayFeedbackMenu,       &delayPingPongMenu,          &delaySendMenu,         nullptr,                  nullptr                            },
     {nullptr,          	     &spreadVelocityMenu,	  &randomizerLockMenu,            &randomizerNoteProbabilityMenu,        nullptr,                     nullptr,                nullptr,                  nullptr                            },
 };
 

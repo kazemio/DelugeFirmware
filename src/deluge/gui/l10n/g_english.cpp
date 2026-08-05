@@ -127,6 +127,8 @@ PLACE_SDRAM_DATA Language english{
         {STRING_FOR_REVERB_AMOUNT, "Reverb amount"},
         {STRING_FOR_DELAY_RATE, "Delay rate"},
         {STRING_FOR_DELAY_AMOUNT, "Delay amount"},
+        {STRING_FOR_DELAY_SEND, "Delay send"},
+        {STRING_FOR_SEND, "Send"},
         {STRING_FOR_SIDECHAIN_LEVEL, "Sidechain level"},
         {STRING_FOR_SIDECHAIN_SHAPE, "Sidechain shape"},
         {STRING_FOR_DISTORTION, "Distortion"},
