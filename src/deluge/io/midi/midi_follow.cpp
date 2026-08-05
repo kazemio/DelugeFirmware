@@ -238,6 +238,8 @@ void MidiFollow::initDefaultMappings() {
 	soundParamToCC[params::UNPATCHED_START + params::UNPATCHED_BITCRUSHING] = 62;
 	ccToSoundParam[63] = params::UNPATCHED_START + params::UNPATCHED_SAMPLE_RATE_REDUCTION;
 	soundParamToCC[params::UNPATCHED_START + params::UNPATCHED_SAMPLE_RATE_REDUCTION] = 63;
+	ccToSoundParam[69] = params::UNPATCHED_START + params::UNPATCHED_DELAY_SEND;
+	soundParamToCC[params::UNPATCHED_START + params::UNPATCHED_DELAY_SEND] = 69;
 	ccToSoundParam[70] = params::LOCAL_LPF_MORPH;
 	soundParamToCC[params::LOCAL_LPF_MORPH] = 70;
 	ccToSoundParam[71] = params::LOCAL_LPF_RESONANCE;
@@ -367,6 +369,8 @@ void MidiFollow::initDefaultMappings() {
 	globalParamToCC[params::UNPATCHED_DELAY_AMOUNT] = 52;
 	ccToGlobalParam[53] = params::UNPATCHED_DELAY_RATE;
 	globalParamToCC[params::UNPATCHED_DELAY_RATE] = 53;
+	ccToGlobalParam[69] = params::UNPATCHED_DELAY_SEND;
+	globalParamToCC[params::UNPATCHED_DELAY_SEND] = 69;
 	ccToGlobalParam[60] = params::UNPATCHED_SIDECHAIN_SHAPE;
 	globalParamToCC[params::UNPATCHED_SIDECHAIN_SHAPE] = 60;
 	ccToGlobalParam[61] = params::UNPATCHED_SIDECHAIN_VOLUME;

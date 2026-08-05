@@ -175,9 +175,10 @@ const std::array<std::pair<params::Kind, ParamType>, kNumNonGlobalParamsForAutom
     {params::Kind::UNPATCHED_SOUND, params::UNPATCHED_TREBLE_FREQ},
     // Reverb Amount
     {params::Kind::PATCHED, params::GLOBAL_REVERB_AMOUNT},
-    // Delay Rate, Amount
+    // Delay Rate, Amount, Send
     {params::Kind::PATCHED, params::GLOBAL_DELAY_RATE},
     {params::Kind::PATCHED, params::GLOBAL_DELAY_FEEDBACK},
+    {params::Kind::UNPATCHED_SOUND, params::UNPATCHED_DELAY_SEND},
     // Sidechain Shape
     {params::Kind::UNPATCHED_SOUND, params::UNPATCHED_SIDECHAIN_SHAPE},
     // Decimation, Bitcrush, Saturation, Wavefolder
@@ -304,9 +305,10 @@ const std::array<std::pair<params::Kind, ParamType>, kNumGlobalParamsForAutomati
     {params::Kind::UNPATCHED_GLOBAL, params::UNPATCHED_TREBLE_FREQ},
     // Reverb Amount
     {params::Kind::UNPATCHED_GLOBAL, params::UNPATCHED_REVERB_SEND_AMOUNT},
-    // Delay Rate, Amount
+    // Delay Rate, Amount, Send
     {params::Kind::UNPATCHED_GLOBAL, params::UNPATCHED_DELAY_RATE},
     {params::Kind::UNPATCHED_GLOBAL, params::UNPATCHED_DELAY_AMOUNT},
+    {params::Kind::UNPATCHED_GLOBAL, params::UNPATCHED_DELAY_SEND},
     // Sidechain Send, Shape
     {params::Kind::UNPATCHED_GLOBAL, params::UNPATCHED_SIDECHAIN_VOLUME},
     {params::Kind::UNPATCHED_GLOBAL, params::UNPATCHED_SIDECHAIN_SHAPE},

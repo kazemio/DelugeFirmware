@@ -306,6 +306,7 @@ char const* getParamDisplayName(Kind kind, int32_t p) {
 		    [UNPATCHED_MB_COMPRESSOR_OUTPUT_GAIN] = STRING_FOR_COMPRESSOR_OUTPUT_GAIN,
 		    [UNPATCHED_MB_COMPRESSOR_VIBE] = STRING_FOR_COMPRESSOR_VIBE,
 		    [UNPATCHED_MB_COMPRESSOR_BLEND] = STRING_FOR_BLEND,
+		    [UNPATCHED_DELAY_SEND] = STRING_FOR_DELAY_SEND,
 		    [UNPATCHED_ARP_GATE] = STRING_FOR_ARP_GATE_MENU_TITLE,
 		    [UNPATCHED_ARP_RHYTHM] = STRING_FOR_ARP_RHYTHM_MENU_TITLE,
 		    [UNPATCHED_ARP_SEQUENCE_LENGTH] = STRING_FOR_ARP_SEQUENCE_LENGTH_MENU_TITLE,
@@ -613,6 +614,9 @@ constexpr char const* paramNameForFileConst(Kind const kind, ParamType const par
 			return "mbCompressorVibe";
 		case UNPATCHED_MB_COMPRESSOR_BLEND:
 			return "mbCompressorBlend";
+
+		case UNPATCHED_DELAY_SEND:
+			return "delaySend";
 
 		case UNPATCHED_ARP_GATE:
 			return "arpGate";

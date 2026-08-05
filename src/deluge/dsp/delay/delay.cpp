@@ -369,16 +369,25 @@ void Delay::process(std::span<StereoSample> buffer, const State& delayWorkingSta
 
 	// Go through what we grabbed, sending it to the audio output buffer, and also preparing it to be fed back
 	// into the delay
+	const bool unitySend = (delayWorkingState.sendAmount == ONE_Q31);
 	for (auto [input, output] : std::views::zip(working_buffer, buffer)) {
 		StereoSample current = input;
+
+		// New audio entering the delay, scaled by the send amount. Full send takes the exact legacy
+		// path so existing songs are unaffected.
+		StereoSample dry = output;
+		if (!unitySend) {
+			dry.l = multiply_32x32_rshift32(dry.l, delayWorkingState.sendAmount) << 1;
+			dry.r = multiply_32x32_rshift32(dry.r, delayWorkingState.sendAmount) << 1;
+		}
 
 		// Feedback calculation, and combination with input
 		if (pingPong && AudioEngine::renderInStereo) {
 			input.l = current.r;
-			input.r = ((output.l + output.r) >> 1) + current.l;
+			input.r = ((dry.l + dry.r) >> 1) + current.l;
 		}
 		else {
-			input += output;
+			input += dry;
 		}
 
 		// Output

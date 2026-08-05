@@ -149,6 +149,9 @@ void ModControllableAudio::initParams(ParamManager* paramManager) {
 	unpatchedParams->params[params::UNPATCHED_SIDECHAIN_SHAPE].setCurrentValueBasicForSetup(-601295438);
 	unpatchedParams->params[params::UNPATCHED_COMPRESSOR_THRESHOLD].setCurrentValueBasicForSetup(0);
 
+	// Full send = the legacy behaviour where all dry audio enters the delay
+	unpatchedParams->params[params::UNPATCHED_DELAY_SEND].setCurrentValueBasicForSetup(2147483647);
+
 	// Multiband compressor default params
 	unpatchedParams->params[params::UNPATCHED_MB_COMPRESSOR_CHARACTER].setCurrentValueBasicForSetup(0);
 	unpatchedParams->params[params::UNPATCHED_MB_COMPRESSOR_LOW_CROSSOVER].setCurrentValueBasicForSetup(ONE_Q31 / 4);
@@ -642,6 +645,8 @@ void ModControllableAudio::writeParamAttributesToFile(Serializer& writer, ParamM
 	                                       writeAutomation, true, valuesForOverride);
 	unpatchedParams->writeParamAsAttribute(writer, "mbCompressorBlend", params::UNPATCHED_MB_COMPRESSOR_BLEND,
 	                                       writeAutomation, true, valuesForOverride);
+	unpatchedParams->writeParamAsAttribute(writer, "delaySend", params::UNPATCHED_DELAY_SEND, writeAutomation, false,
+	                                       valuesForOverride);
 
 	unpatchedParams->writeParamAsAttribute(writer, "arpeggiatorGate", params::UNPATCHED_ARP_GATE, writeAutomation);
 	unpatchedParams->writeParamAsAttribute(writer, "noteProbability", params::UNPATCHED_NOTE_PROBABILITY,
@@ -830,6 +835,11 @@ bool ModControllableAudio::readParamTagFromFile(Deserializer& reader, char const
 		unpatchedParams->readParam(reader, unpatchedParamsSummary, params::UNPATCHED_MB_COMPRESSOR_BLEND,
 		                           readAutomationUpToPos);
 		reader.exitTag("mbCompressorBlend");
+	}
+
+	else if (!strcmp(tagName, "delaySend")) {
+		unpatchedParams->readParam(reader, unpatchedParamsSummary, params::UNPATCHED_DELAY_SEND, readAutomationUpToPos);
+		reader.exitTag("delaySend");
 	}
 
 	// Arpeggiator stuff
