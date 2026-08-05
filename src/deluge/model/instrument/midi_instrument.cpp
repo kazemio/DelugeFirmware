@@ -28,6 +28,7 @@
 #include "model/clip/instrument_clip.h"
 #include "model/song/song.h"
 #include "modulation/arpeggiator.h"
+#include "modulation/macros/macros.h"
 #include "modulation/midi/midi_param.h"
 #include "modulation/midi/midi_param_collection.h"
 #include "modulation/params/param_set.h"
@@ -138,8 +139,9 @@ int32_t MIDIInstrument::getKnobPosForNonExistentParam(int32_t whichModEncoder, M
 
 ModelStackWithAutoParam*
 MIDIInstrument::getParamToControlFromInputMIDIChannel(int32_t cc, ModelStackWithThreeMainThings* modelStack) {
-	// ensure that we are trying to create a param for a valid cc number
-	bool is_cc_valid = ((cc >= 0) && (cc < kNumCCExpression));
+	// ensure that we are trying to create a param for a valid cc number (or a macro automation lane,
+	// paramID 128-131, which is stored as a pseudo-CC MIDIParam but never emitted as MIDI)
+	bool is_cc_valid = ((cc >= 0) && (cc < kNumCCExpression)) || Macros::isMacroParamID(cc);
 
 	// if cc is not valid or param manager is null (which can happen if the user is holding down an audition pad in
 	// Arranger, and we have no clips)
@@ -348,6 +350,7 @@ bool MIDIInstrument::writeDataToFile(Serializer& writer, Clip* clipForSavingOutp
 
 void MIDIInstrument::writeDeviceDefinitionFile(Serializer& writer, bool writeFileNameToPresetOrSong) {
 	writer.writeOpeningTagBeginning("midiDevice");
+	writer.writeAttribute("onlyShowDefinedCCs", (int32_t)only_show_defined_ccs);
 	writer.writeOpeningTagEnd();
 
 	if (writeFileNameToPresetOrSong) {
@@ -490,7 +493,10 @@ Error MIDIInstrument::readDeviceDefinitionFile(Deserializer& reader, bool readFr
 
 	// step into any subtags
 	while (*(tagName = reader.readNextTagOrAttributeName())) {
-		if (!strcmp(tagName, "definitionFile")) {
+		if (!strcmp(tagName, "onlyShowDefinedCCs")) {
+			only_show_defined_ccs = (bool)reader.readTagOrAttributeValueInt();
+		}
+		else if (!strcmp(tagName, "definitionFile")) {
 			readDeviceDefinitionFileNameFromPresetOrSong(reader);
 			// only flag definition file for loading if we aren't reading from preset or song
 			// and definition file name isn't blank
@@ -575,6 +581,11 @@ Error MIDIInstrument::readMIDIParamFromFile(Deserializer& reader, int32_t readAu
 			// will be sent as mod wheel and also map to internal mono expression
 			if (cc == CC_EXTERNAL_MOD_WHEEL) {
 				cc = CC_NUMBER_Y_AXIS;
+			}
+			// Macro lane pseudo-CCs were ids 128-131 before kMacroParamIDBase moved to 176
+			if (cc >= Macros::kMacroParamIDBaseLegacy && cc < Macros::kMacroParamIDBaseLegacy + Macros::kNumMacroParams
+			    && Macros::kMacroParamIDBase != Macros::kMacroParamIDBaseLegacy) {
+				cc = Macros::kMacroParamIDBase + (cc - Macros::kMacroParamIDBaseLegacy);
 			}
 
 			reader.exitTag("cc");
