@@ -137,6 +137,9 @@ void ModControllableAudio::initParams(ParamManager* paramManager) {
 
 	unpatchedParams->params[params::UNPATCHED_SIDECHAIN_SHAPE].setCurrentValueBasicForSetup(-601295438);
 	unpatchedParams->params[params::UNPATCHED_COMPRESSOR_THRESHOLD].setCurrentValueBasicForSetup(0);
+
+	// Full send = the legacy behaviour where all dry audio enters the delay
+	unpatchedParams->params[params::UNPATCHED_DELAY_SEND].setCurrentValueBasicForSetup(2147483647);
 }
 
 bool ModControllableAudio::hasBassAdjusted(ParamManager* paramManager) {
@@ -503,6 +506,8 @@ void ModControllableAudio::writeParamAttributesToFile(Serializer& writer, ParamM
 	// Community Firmware parameters (always write them after the official ones, just before closing the parent tag)
 	unpatchedParams->writeParamAsAttribute(writer, "compressorThreshold", params::UNPATCHED_COMPRESSOR_THRESHOLD,
 	                                       writeAutomation, false, valuesForOverride);
+	unpatchedParams->writeParamAsAttribute(writer, "delaySend", params::UNPATCHED_DELAY_SEND, writeAutomation, false,
+	                                       valuesForOverride);
 
 	unpatchedParams->writeParamAsAttribute(writer, "arpeggiatorGate", params::UNPATCHED_ARP_GATE, writeAutomation);
 	unpatchedParams->writeParamAsAttribute(writer, "noteProbability", params::UNPATCHED_NOTE_PROBABILITY,
@@ -614,6 +619,11 @@ bool ModControllableAudio::readParamTagFromFile(Deserializer& reader, char const
 		unpatchedParams->readParam(reader, unpatchedParamsSummary, params::UNPATCHED_COMPRESSOR_THRESHOLD,
 		                           readAutomationUpToPos);
 		reader.exitTag("compressorThreshold");
+	}
+
+	else if (!strcmp(tagName, "delaySend")) {
+		unpatchedParams->readParam(reader, unpatchedParamsSummary, params::UNPATCHED_DELAY_SEND, readAutomationUpToPos);
+		reader.exitTag("delaySend");
 	}
 
 	// Arpeggiator stuff

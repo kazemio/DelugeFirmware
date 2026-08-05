@@ -1136,6 +1136,8 @@ Delay::State GlobalEffectable::createDelayWorkingState(ParamManager& paramManage
 	delayWorkingState.userDelayRate =
 	    getFinalParameterValueExp(paramNeutralValues[params::GLOBAL_DELAY_RATE],
 	                              cableToExpParamShortcut(unpatchedParams->getValue(params::UNPATCHED_DELAY_RATE)));
+	delayWorkingState.sendAmount =
+	    (int32_t)(((uint32_t)unpatchedParams->getValue(params::UNPATCHED_DELAY_SEND) + 2147483648u) >> 1);
 	uint32_t timePerTickInverse = playbackHandler.getTimePerInternalTickInverse(true);
 	delay.setupWorkingState(delayWorkingState, timePerTickInverse, soundComingIn);
 
