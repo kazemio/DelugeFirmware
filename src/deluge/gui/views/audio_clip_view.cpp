@@ -26,6 +26,8 @@
 #include "gui/ui_timer_manager.h"
 #include "gui/views/arranger_view.h"
 #include "gui/views/automation_view.h"
+#include "gui/views/clip_type_splash.h"
+#include "gui/views/macro_target_assign_overlay.h"
 #include "gui/views/session_view.h"
 #include "gui/views/view.h"
 #include "gui/waveform/waveform_renderer.h"
@@ -43,6 +45,7 @@
 #include "model/sample/sample_playback_guide.h"
 #include "model/sample/sample_recorder.h"
 #include "model/song/song.h"
+#include "modulation/macros/macros.h"
 #include "playback/mode/arrangement.h"
 #include "playback/mode/playback_mode.h"
 #include "playback/mode/session.h"
@@ -59,11 +62,14 @@ using namespace deluge::gui;
 PLACE_SDRAM_BSS AudioClipView audioClipView{};
 
 inline Sample* getSample() {
-	AudioClip& clip = *getCurrentAudioClip();
-	if (clip.getCurrentlyRecordingLinearly()) {
-		return clip.recorder->sample;
+	AudioClip* clip = getCurrentAudioClip();
+	if (!clip) {
+		return nullptr; // e.g. an FXClip - never has a sample
 	}
-	return static_cast<Sample*>(clip.sampleHolder.audioFile);
+	if (clip->getCurrentlyRecordingLinearly()) {
+		return clip->recorder->sample;
+	}
+	return static_cast<Sample*>(clip->sampleHolder.audioFile);
 }
 
 bool AudioClipView::opened() {
@@ -106,11 +112,37 @@ bool AudioClipView::renderMainPads(uint32_t whichRows, RGB image[][kDisplayWidth
 		return true;
 	}
 
-	// If no Sample, just clear display
+	// While a macro button is held in MACRO mode, the shared target-picker overlay owns the main pads
+	// (param shortcuts to assign), exactly as in note view - it replaces the waveform for the duration
+	// of the hold, resolving this audio clip's GLOBAL destinations.
+	if (macroTargetAssignOverlay.active()) {
+		macroTargetAssignOverlay.renderOverlay(image, occupancyMask);
+		return true;
+	}
+
+	// If no Sample, spell the clip type across the pads while the clip is empty
+	// (AUDIO with no sample loaded; FX until any automation exists). While recording is underway
+	// the grid just clears so the incoming waveform draws onto a clean background.
 	if (!getSample()) {
-		for (int32_t y = 0; y < kDisplayHeight; y++) {
-			memset(image[y], 0, kDisplayWidth * 3);
+		Clip* clip = getCurrentClip();
+		char const* word = nullptr;
+		RGB colour = colours::black;
+		if (clip && clipTypeSplashBootSettled()) {
+			if (clip->type == ClipType::FX) {
+				if (clip->isEmpty(false)) {
+					word = "FX";
+					colour = colours::orange.dim();
+				}
+			}
+			else if (!clip->getCurrentlyRecordingLinearly()) {
+				word = "AUDIO";
+				colour = colours::green.dim();
+			}
 		}
+		if (clipTypeSplashStateChanged(word != nullptr)) {
+			whichRows = 0xFFFFFFFF;
+		}
+		renderClipTypeSplash(word, colour, whichRows, image, occupancyMask);
 		return true;
 	}
 
@@ -124,6 +156,14 @@ bool AudioClipView::renderMainPads(uint32_t whichRows, RGB image[][kDisplayWidth
 	}
 
 	AudioClip& clip = *clipPtr;
+
+	// If the splash (or its blank state) was on the pads last render, the cached waveform render
+	// data no longer matches what's displayed - repaint everything from scratch.
+	if (clipTypeSplashStateChanged(false)) {
+		whichRows = 0xFFFFFFFF;
+		clip.renderData.xScroll = -1;
+	}
+
 	SampleRecorder* recorder = clip.recorder;
 
 	// end marker column
@@ -328,6 +368,22 @@ void AudioClipView::needsRenderingDependingOnSubMode() {
 ActionResult AudioClipView::buttonAction(deluge::hid::Button b, bool on, bool inCardRoutine) {
 	using namespace deluge::hid::button;
 
+	// SHIFT + Y_ENC toggles gold-knob MACRO mode on a macro-capable audio clip (idle only). Audio clips
+	// drive their macros from the gold knobs like note-view clips do, and hold-a-macro-button opens the
+	// shared target-picker overlay on these pads (the waveform is replaced for the hold).
+	if (b == Y_ENC && on && Buttons::isShiftButtonPressed() && currentUIMode == UI_MODE_NONE && Macros::isEnabled()
+	    && view.macroKnobModeAvailable(getCurrentClip())) {
+		view.toggleMacroKnobMode();
+		return ActionResult::DEALT_WITH;
+	}
+
+	// SHIFT + SAVE/DELETE while the macro target-picker overlay is up: remove the selected pad's
+	// assignment (the same gesture note view offers during the hold).
+	if (macroTargetAssignOverlay.active() && b == SAVE && on && Buttons::isShiftButtonPressed()) {
+		macroTargetAssignOverlay.deleteSelectedTarget();
+		return ActionResult::DEALT_WITH;
+	}
+
 	ActionResult result;
 
 	// Song view button
@@ -385,6 +441,24 @@ dontDeactivateMarker:
 	}
 
 	else if (b == X_ENC) {
+		// FX clip: no sample, so shift + encoder press "multiplies" the clip like on instrument
+		// clips - doubles the length and repeats the automation into the new half
+		if (getCurrentClip()->type == ClipType::FX) {
+			if (on && Buttons::isShiftButtonPressed() && currentUIMode == UI_MODE_NONE) {
+				if (inCardRoutine) {
+					return ActionResult::REMIND_ME_OUTSIDE_CARD_ROUTINE;
+				}
+				// Zoom to max if we weren't already there...
+				if (!zoomToMax()) {
+					// Or if we didn't need to do that, double Clip length
+					doubleClipLengthAction();
+				}
+				else {
+					displayZoomLevel();
+				}
+			}
+			goto dontDeactivateMarker; // no sample marker to worry about
+		}
 		// removing time stretching by re-calculating clip length based on length of audio sample
 		if (Buttons::isButtonPressed(deluge::hid::button::Y_ENC)) {
 			if (on && currentUIMode == UI_MODE_NONE) {
@@ -431,7 +505,7 @@ dontDeactivateMarker:
 			ModelStackWithTimelineCounter* modelStack =
 			    setupModelStackWithTimelineCounter(modelStackMemory, currentSong, getCurrentClip());
 
-			getCurrentAudioClip()->clear(action, modelStack, !FlashStorage::automationClear, true);
+			getCurrentClip()->clear(action, modelStack, !FlashStorage::automationClear, true);
 
 			// New default as part of Automation Clip View Implementation
 			// If this is enabled, then when you are in Audio Clip View, clearing
@@ -475,8 +549,17 @@ deactivateMarkerIfNecessary:
 
 ActionResult AudioClipView::padAction(int32_t x, int32_t y, int32_t on) {
 	if (x < kDisplayWidth) {
+		// While the macro target-picker overlay owns the main pads, a tap picks that param as the held
+		// macro's target; every press is consumed so nothing edits the waveform under the overlay.
+		if (macroTargetAssignOverlay.active()) {
+			if (sdRoutineLock) {
+				return ActionResult::REMIND_ME_OUTSIDE_CARD_ROUTINE;
+			}
+			macroTargetAssignOverlay.handlePad(x, y, on);
+			return ActionResult::DEALT_WITH;
+		}
 		if (Buttons::isButtonPressed(deluge::hid::button::TEMPO_ENC)) {
-			if (on) {
+			if (on && getCurrentAudioClip()) {
 				playbackHandler.grabTempoFromClip(getCurrentAudioClip());
 			}
 		}
@@ -728,7 +811,17 @@ void AudioClipView::sampleNeedsReRendering(Sample* s) {
 }
 
 void AudioClipView::selectEncoderAction(int8_t offset) {
+	// While a macro button is held (target picker up), the select encoder dials a destination to add -
+	// reaching params that have no shortcut pad; committed on release.
+	if (macroTargetAssignOverlay.active()) {
+		macroTargetAssignOverlay.handleSelectEncoder(offset);
+		return;
+	}
 	if (currentUIMode) {
+		return;
+	}
+	// nothing to navigate or scroll for an FX clip - there's only one FX track and no output modes
+	if (!getCurrentAudioClip()) {
 		return;
 	}
 	// allows you to assign an audio clip to a different audio track
@@ -742,7 +835,12 @@ void AudioClipView::selectEncoderAction(int8_t offset) {
 }
 
 void AudioClipView::setClipLengthEqualToSampleLength() {
-	AudioClip& audioClip = *getCurrentAudioClip();
+	AudioClip* audioClipPtr = getCurrentAudioClip();
+	if (!audioClipPtr) {
+		display->displayPopup(deluge::l10n::get(deluge::l10n::String::STRING_FOR_NO_SAMPLE));
+		return;
+	}
+	AudioClip& audioClip = *audioClipPtr;
 	SamplePlaybackGuide guide = audioClip.guide;
 	SampleHolder* sampleHolder = (SampleHolder*)guide.audioFileHolder;
 	if (sampleHolder) {
@@ -816,18 +914,21 @@ ActionResult AudioClipView::editClipLengthWithoutTimestretching(int32_t offset) 
 	}
 
 	int32_t oldLength = getCurrentClip()->loopLength;
-	uint64_t oldLengthSamples = getCurrentAudioClip()->sampleHolder.getDurationInSamples(true);
 
 	Action* action = nullptr;
 	uint32_t newLength = changeClipLength(offset, oldLength, action);
 
-	AudioClip& audioClip = *getCurrentAudioClip();
-	SamplePlaybackGuide guide = audioClip.guide;
-	SampleHolder* sampleHolder = (SampleHolder*)guide.audioFileHolder;
-	if (sampleHolder) {
-		Sample* sample = static_cast<Sample*>(sampleHolder->audioFile);
-		if (sample) {
-			changeUnderlyingSampleLength(audioClip, sample, newLength, oldLength, oldLengthSamples);
+	AudioClip* audioClipPtr = getCurrentAudioClip();
+	if (audioClipPtr) {
+		AudioClip& audioClip = *audioClipPtr;
+		uint64_t oldLengthSamples = audioClip.sampleHolder.getDurationInSamples(true);
+		SamplePlaybackGuide guide = audioClip.guide;
+		SampleHolder* sampleHolder = (SampleHolder*)guide.audioFileHolder;
+		if (sampleHolder) {
+			Sample* sample = static_cast<Sample*>(sampleHolder->audioFile);
+			if (sample) {
+				changeUnderlyingSampleLength(audioClip, sample, newLength, oldLength, oldLengthSamples);
+			}
 		}
 	}
 
@@ -845,14 +946,14 @@ ActionResult AudioClipView::verticalEncoderAction(int32_t offset, bool inCardRou
 		}
 
 		// Shift colour spectrum
-		getCurrentAudioClip()->colourOffset += offset;
+		getCurrentClip()->colourOffset += offset;
 		uiNeedsRendering(this, 0xFFFFFFFF, 0);
 	}
 	return ActionResult::DEALT_WITH;
 }
 
 bool AudioClipView::setupScroll(uint32_t oldScroll) {
-	if (!getCurrentAudioClip()->currentlyScrollableAndZoomable()) {
+	if (!getCurrentClip()->currentlyScrollableAndZoomable()) {
 		return false;
 	}
 	return ClipView::setupScroll(oldScroll);

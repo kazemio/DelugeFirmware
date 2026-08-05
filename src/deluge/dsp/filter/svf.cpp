@@ -17,10 +17,17 @@
 #include "dsp/filter/svf.h"
 
 namespace deluge::dsp::filter {
+// Each doSVF pass multiplies by 1.5 to match ladder loudness; the cascade would come out 2.25x,
+// so trim its output by 2/3 to land back on the single-stage 1.5x.
+constexpr q31_t kTwoThirds = (q31_t)(ONE_Q31 * 2.0 / 3.0);
+
 [[gnu::hot]] void SVFilter::doFilter(q31_t* startSample, q31_t* endSample, int32_t sampleIncrememt) {
 	q31_t* currentSample = startSample;
 	do {
 		q31_t outs = doSVF(*currentSample, l);
+		if (hp24_mode) {
+			outs = 2 * multiply_32x32_rshift32(doSVF(outs, l2), kTwoThirds);
+		}
 		*currentSample = outs;
 
 		currentSample += sampleIncrememt;
@@ -30,9 +37,12 @@ namespace deluge::dsp::filter {
 	q31_t* currentSample = startSample;
 	do {
 		q31_t outs = doSVF(*currentSample, l);
-
-		*currentSample = outs;
 		q31_t outs2 = doSVF(*(currentSample + 1), r);
+		if (hp24_mode) {
+			outs = 2 * multiply_32x32_rshift32(doSVF(outs, l2), kTwoThirds);
+			outs2 = 2 * multiply_32x32_rshift32(doSVF(outs2, r2), kTwoThirds);
+		}
+		*currentSample = outs;
 		*(currentSample + 1) = outs2;
 		currentSample += 2;
 	} while (currentSample < endSample);
@@ -46,6 +56,7 @@ q31_t SVFilter::setConfig(q31_t freq, q31_t res, FilterMode lpfMode, q31_t lpfMo
 	fc = fc + multiply_32x32_rshift32(fc, POINT_25);
 
 	band_mode = (lpfMode == FilterMode::SVF_BAND);
+	hp24_mode = (lpfMode == FilterMode::SVF_HP24);
 	// raw resonance is 0 - 536870896 (2^28ish, don't know where it comes from)
 	// Multiply by 4 to bring it to the q31 0-1 range
 	q = (ONE_Q31 - 4 * (res));
@@ -57,7 +68,13 @@ q31_t SVFilter::setConfig(q31_t freq, q31_t res, FilterMode lpfMode, q31_t lpfMo
 	// note - the if statements are to avoid overflow issues
 	// do not remove
 	constexpr q31_t ONE_HALF = ONE_Q31 >> 1;
-	if (band_mode) {
+	if (hp24_mode) {
+		// pure highpass through both stages; morph unused
+		c_low = 0;
+		c_band = 0;
+		c_high = ONE_Q31;
+	}
+	else if (band_mode) {
 		if (lpfMorph > (ONE_HALF)) {
 			lpfMorph = 2 * (lpfMorph - (ONE_HALF));
 			c_low = 0;
