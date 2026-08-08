@@ -80,12 +80,22 @@ ModControllableAudio* contextTarget() {
 	return &currentSong->globalEffectable;
 }
 
+// While a clip/section/row pad is held, the views draw info (output name, section, track type)
+// straight onto the main canvas; yield the screen for the duration of the hold. The release paths
+// all re-render (clipPressEnded, auditionEnded), which brings the takeover straight back.
+bool holdingPadThatShowsInfo() {
+	return isUIModeActive(UI_MODE_CLIP_PRESSED_IN_SONG_VIEW) || isUIModeActive(UI_MODE_HOLDING_SECTION_PAD)
+	       || isUIModeActive(UI_MODE_HOLDING_ARRANGEMENT_ROW_AUDITION)
+	       || isUIModeActive(UI_MODE_HOLDING_ARRANGEMENT_ROW);
+}
+
 // Both takeover modes only apply on a root view (menus and browsers render normally), never in
 // automation view, and only on OLED hardware. Checking the community toggle here too means
 // disabling the feature mid-overlay restores the normal display instead of stranding the screen
 // (the combo is inert while disabled, so it couldn't cycle back out).
 bool takeoverAllowedNow() {
 	return display->haveOLED() && getCurrentUI() == getRootUI() && getRootUI() != &automationView
+	       && !holdingPadThatShowsInfo()
 	       && runtimeFeatureSettings.isOn(RuntimeFeatureSettingType::EnableSpectrumAnalyzer);
 }
 
