@@ -109,6 +109,7 @@ tryDefaultDir:
 		break;
 	case OutputType::CV:
 	case OutputType::AUDIO:
+	case OutputType::AUDIO_FX:
 	case OutputType::NONE:;
 	}
 
@@ -133,6 +134,7 @@ gotError:
 		break;
 	case OutputType::CV:
 	case OutputType::AUDIO:
+	case OutputType::AUDIO_FX:
 	case OutputType::NONE:;
 	}
 
