@@ -3324,12 +3324,27 @@ void AutomationView::selectMIDICC(int32_t offset, Clip* clip) {
 	const int32_t firstPos = macros ? -Macros::kNumMacroParams : 0; // macro 1, or CC 0
 	const int32_t lastPos = CC_NUMBER_Y_AXIS;                       // 122
 
+	// honour the device definition's "hide unlabeled CCs" toggle while scrolling.
+	// Expression params (>= kNumRealCCNumbers) and macro lanes (negative positions) are
+	// always shown, so the visible set is never empty and the skip loop can never get stuck.
+	MIDIInstrument* midiInstrument = nullptr;
+	bool hideUnlabeled = false;
+	if (clip->output != nullptr && clip->output->type == OutputType::MIDI_OUT) {
+		midiInstrument = (MIDIInstrument*)clip->output;
+		hideUnlabeled = midiInstrument->hideUnlabeledCC;
+	}
+
+	const int32_t direction = (offset >= 0) ? 1 : -1;
 	int32_t pos;
 	if (onAutomationOverview()) {
 		pos = (offset >= 0) ? firstPos : lastPos; // first scroll lands on the first (or last) lane
 	}
 	else {
 		pos = midiCCToOrderedPos(clip->lastSelectedParamID) + offset;
+	}
+
+	int32_t guard = 0;
+	while (true) {
 		if (pos < firstPos) {
 			pos = lastPos;
 		}
@@ -3338,9 +3353,17 @@ void AutomationView::selectMIDICC(int32_t offset, Clip* clip) {
 		}
 		// CC 1 (external mod wheel) is internally CC_NUMBER_Y_AXIS, so skip it in the scroll direction
 		if (pos == CC_EXTERNAL_MOD_WHEEL) {
-			pos += (offset >= 0) ? 1 : -1;
+			pos += direction;
+			continue;
 		}
+		if (hideUnlabeled && pos >= 0 && pos < kNumRealCCNumbers && midiInstrument->getNameFromCC(pos).empty()
+		    && ++guard <= kNumCCExpression) {
+			pos += direction;
+			continue;
+		}
+		break;
 	}
+
 	clip->lastSelectedParamID = midiOrderedPosToCC(pos);
 	automationParamType = AutomationParamType::PER_SOUND;
 }
