@@ -38,6 +38,8 @@
 #include "gui/ui/ui.h"
 #include "gui/ui_timer_manager.h"
 #include "gui/views/automation_view.h"
+#include "gui/views/clip_type_splash.h"
+#include "gui/views/macro_target_assign_overlay.h"
 #include "gui/views/timeline_view.h"
 #include "gui/views/view.h"
 #include "hid/buttons.h"
@@ -56,7 +58,6 @@
 #include "model/action/action_logger.h"
 #include "model/clip/clip.h"
 #include "model/clip/instrument_clip.h"
-#include "model/consequence/consequence_instrument_clip_multiply.h"
 #include "model/consequence/consequence_note_array_change.h"
 #include "model/consequence/consequence_note_row_horizontal_shift.h"
 #include "model/consequence/consequence_note_row_length.h"
@@ -73,6 +74,7 @@
 #include "model/settings/runtime_feature_settings.h"
 #include "model/song/song.h"
 #include "modulation/automation/auto_param.h"
+#include "modulation/macros/macros.h"
 #include "modulation/params/param_manager.h"
 #include "modulation/params/param_node.h"
 #include "modulation/params/param_set.h"
@@ -250,6 +252,13 @@ ActionResult InstrumentClipView::commandExitScaleMode() {
 
 ActionResult InstrumentClipView::buttonAction(deluge::hid::Button b, bool on, bool inCardRoutine) {
 	using namespace deluge::hid::button;
+
+	// SHIFT + SAVE/DELETE while holding a macro button (target picker up): delete the currently-selected
+	// pad's assignment from this macro; the pad reverts to grey.
+	if (macroTargetAssignOverlay.active() && b == SAVE && on && Buttons::isShiftButtonPressed()) {
+		macroTargetAssignOverlay.deleteSelectedTarget();
+		return ActionResult::DEALT_WITH;
+	}
 
 	// Scale mode button
 	if (b == SCALE_MODE && currentUIMode != UI_MODE_HOLDING_LOAD_BUTTON) {
@@ -777,6 +786,15 @@ doCancelPopup:
 
 	// Vertical encoder button
 	else if (b == Y_ENC) {
+
+		// SHIFT + Y_ENC toggles the gold-knob MACRO mode (any macro-capable note-view clip: synth, MIDI,
+		// kit - the last only in affect-entire, since kit macros drive kit-global params). Only when idle
+		// - so it never shadows the note-repeat / euclidean gestures that use Y_ENC while notes are held.
+		if (on && Buttons::isShiftButtonPressed() && currentUIMode == UI_MODE_NONE && Macros::isEnabled()
+		    && view.macroKnobModeAvailable(getCurrentClip())) {
+			view.toggleMacroKnobMode();
+			return ActionResult::DEALT_WITH;
+		}
 
 		// If holding notes down...
 		if (isUIModeActiveExclusively(UI_MODE_NOTES_PRESSED)) {
@@ -1691,45 +1709,6 @@ getOut: {}
 	return Error::NONE;
 }
 
-void InstrumentClipView::doubleClipLengthAction() {
-
-	// If too big...
-	if (getCurrentClip()->loopLength > (kMaxSequenceLength >> 1)) {
-		display->displayPopup(deluge::l10n::get(deluge::l10n::String::STRING_FOR_MAXIMUM_LENGTH_REACHED));
-		return;
-	}
-
-	Action* action = actionLogger.getNewAction(ActionType::CLIP_MULTIPLY, ActionAddition::NOT_ALLOWED);
-
-	// Add the ConsequenceClipMultiply to the Action. This must happen before calling doubleClipLength(), which may add
-	// note changes and deletions, because when redoing, those have to happen after (and they'll have no effect at all,
-	// but who cares)
-	if (action) {
-		void* consMemory = GeneralMemoryAllocator::get().allocLowSpeed(sizeof(ConsequenceInstrumentClipMultiply));
-
-		if (consMemory) {
-			ConsequenceInstrumentClipMultiply* newConsequence = new (consMemory) ConsequenceInstrumentClipMultiply();
-			action->addConsequence(newConsequence);
-		}
-	}
-
-	// Double the length, and duplicate the Clip content too
-	currentSong->doubleClipLength(getCurrentInstrumentClip(), action);
-
-	zoomToMax(false);
-
-	if (action) {
-		action->xZoomClip[AFTER] = currentSong->xZoom[NAVIGATION_CLIP];
-		action->xScrollClip[AFTER] = currentSong->xScroll[NAVIGATION_CLIP];
-	}
-
-	displayZoomLevel();
-
-	if (display->haveOLED()) {
-		display->consoleText("Clip multiplied");
-	}
-}
-
 bool InstrumentClipView::createNewInstrument(OutputType newOutputType, bool is_dx) {
 	if (InstrumentClipMinder::createNewInstrument(newOutputType, is_dx)) {
 		recalculateColours();
@@ -1768,6 +1747,13 @@ bool InstrumentClipView::changeOutputType(OutputType newOutputType) {
 }
 
 void InstrumentClipView::selectEncoderAction(int8_t offset) {
+
+	// While a macro button is held (target picker up), the select encoder dials a destination to add -
+	// reaching params that have no shortcut pad (e.g. most MIDI CCs); committed on release.
+	if (macroTargetAssignOverlay.active()) {
+		macroTargetAssignOverlay.handleSelectEncoder(offset);
+		return;
+	}
 
 	// User may be trying to edit noteCode...
 	if (currentUIMode == UI_MODE_AUDITIONING) {
@@ -1857,6 +1843,17 @@ const uint32_t auditionPadActionUIModes[] = {UI_MODE_AUDITIONING,
                                              0};
 
 ActionResult InstrumentClipView::padAction(int32_t x, int32_t y, int32_t velocity) {
+
+	// Macro-target picker (a macro button is held in MACRO mode): main-grid taps assign params to the
+	// held macro's next free target slot. Both press and release are handled (the both-layer cycle
+	// happens on release). Every main-grid press/release is consumed so nothing edits notes.
+	if (macroTargetAssignOverlay.active() && x < kDisplayWidth) {
+		if (sdRoutineLock) {
+			return ActionResult::REMIND_ME_OUTSIDE_CARD_ROUTINE;
+		}
+		macroTargetAssignOverlay.handlePad(x, y, velocity);
+		return ActionResult::DEALT_WITH;
+	}
 
 	// Drum Randomizer
 	if (x == 15 && y == 2 && velocity > 0
@@ -3909,6 +3906,14 @@ ActionResult InstrumentClipView::handleNoteRowEditorButtonAction(deluge::hid::Bu
 		if (clip->output->type == OutputType::KIT) {
 			clip->affectEntire = !clip->affectEntire;
 			view.setActiveModControllableTimelineCounter(clip);
+			// A kit's gold-knob MACRO mode only applies in affect-entire (its macros drive kit-global
+			// params), so turning affect-entire off drops cleanly back to param control - re-enter with
+			// SHIFT+Y_ENC. Refresh the knob rings / mod LEDs so the switch is immediate.
+			if (clip->output->macroKnobMode && !view.macroKnobModeAvailable(clip)) {
+				clip->output->macroKnobMode = false;
+				view.setKnobIndicatorLevels();
+				view.setModLedStates();
+			}
 		}
 	}
 	// to allow you to toggle playback on / off
@@ -7336,6 +7341,51 @@ bool InstrumentClipView::renderMainPads(uint32_t whichRows, RGB image[][kDisplay
 	}
 
 	if (isUIModeActive(UI_MODE_INSTRUMENT_CLIP_COLLAPSING) || isUIModeActive(UI_MODE_IMPLODE_ANIMATION)) {
+		return true;
+	}
+
+	// While a macro button is held in MACRO mode, the main grid is the macro-target picker instead of notes.
+	if (macroTargetAssignOverlay.active()) {
+		PadLEDs::renderingLock = true;
+		macroTargetAssignOverlay.renderOverlay(image, occupancyMask);
+		PadLEDs::renderingLock = false;
+		return true;
+	}
+
+	// A totally empty clip spells its type across the pads until the first note lands. Held off
+	// until boot settles, else the blank boot song's default synth clip flashes "SYNTH" before
+	// the startup song loads.
+	char const* splashWord = nullptr;
+	RGB splashColour = colours::black;
+	if (clipTypeSplashBootSettled() && !getCurrentInstrumentClip()->containsAnyNotes()) {
+		switch (getCurrentOutputType()) {
+		case OutputType::SYNTH:
+			splashWord = "SYNTH";
+			splashColour = colours::darkblue.dim();
+			break;
+		case OutputType::KIT:
+			splashWord = "KIT";
+			splashColour = colours::yellow.dim();
+			break;
+		case OutputType::MIDI_OUT:
+			splashWord = "MIDI";
+			splashColour = colours::red.dim();
+			break;
+		case OutputType::CV:
+			splashWord = "CV";
+			splashColour = colours::purple.dim();
+			break;
+		default:
+			break;
+		}
+	}
+	if (clipTypeSplashStateChanged(splashWord != nullptr)) {
+		whichRows = 0xFFFFFFFF;
+	}
+	if (splashWord) {
+		PadLEDs::renderingLock = true;
+		renderClipTypeSplash(splashWord, splashColour, whichRows, image, occupancyMask);
+		PadLEDs::renderingLock = false;
 		return true;
 	}
 

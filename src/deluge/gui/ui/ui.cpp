@@ -15,7 +15,9 @@
  * If not, see <https://www.gnu.org/licenses/>.
  */
 
+#include "dsp/spectrum/spectrum_analyzer.h"
 #include "gui/ui/root_ui.h"
+#include "gui/ui/spectrum_overlay.h"
 #include "gui/ui_timer_manager.h"
 #include "gui/views/view.h"
 #include "hid/display/display.h"
@@ -105,6 +107,11 @@ bool changeUIAtLevel(UI* newUI, int32_t level) {
 // Called when we navigate between "root" UIs, like sessionView, instrumentClipView, automationView,
 // performanceView, etc.
 void changeRootUI(UI* newUI) {
+	// the macro-inactive status popup is tied to the automation lane it was shown over; automation
+	// view re-shows it from focusRegained() when still applicable
+	if (display->hasPopupOfType(PopupType::MACRO_INACTIVE)) {
+		display->cancelPopup();
+	}
 	newUI = newUI->getUI();
 	uiNavigationHierarchy[0] = newUI;
 	numUIsOpen = 1;
@@ -231,6 +238,11 @@ void closeUI(UI* uiToClose) {
 }
 
 bool openUI(UI* newUI) {
+	// the macro-inactive status popup mustn't sit over a UI opened on top; automation view
+	// re-shows it from focusRegained() when the UI closes
+	if (display->hasPopupOfType(PopupType::MACRO_INACTIVE)) {
+		display->cancelPopup();
+	}
 	newUI = newUI->getUI();
 	UI* oldUI = getCurrentUI();
 	uiNavigationHierarchy[numUIsOpen] = newUI;
@@ -358,16 +370,25 @@ void doAnyPendingGridRendering() {
 
 void doAnyPendingOLEDRendering() {
 	if (doesOLEDNeedRendering) {
-		int32_t u = numUIsOpen - 1;
-		while ((u > 0) && uiNavigationHierarchy[u]->oledShowsUIUnderneath) {
-			u--;
+		if (deluge::gui::spectrum_overlay::shouldShowSpectrum()) {
+			OLED::clearMainImage();
+			spectrumAnalyzer.renderToCanvas(deluge::hid::display::OLED::main);
 		}
+		else if (deluge::gui::spectrum_overlay::shouldBlankDisplay()) {
+			OLED::clearMainImage();
+		}
+		else {
+			int32_t u = numUIsOpen - 1;
+			while ((u > 0) && uiNavigationHierarchy[u]->oledShowsUIUnderneath) {
+				u--;
+			}
 
-		OLED::clearMainImage();
-		u = std::max(u, 0L);
-		for (; u < numUIsOpen; u++) {
-			OLED::stopScrollingAnimation();
-			uiNavigationHierarchy[u]->renderOLED(deluge::hid::display::OLED::main);
+			OLED::clearMainImage();
+			u = std::max(u, 0L);
+			for (; u < numUIsOpen; u++) {
+				OLED::stopScrollingAnimation();
+				uiNavigationHierarchy[u]->renderOLED(deluge::hid::display::OLED::main);
+			}
 		}
 
 		// Don't need to mark dirty because clearMainImage has already done that for us

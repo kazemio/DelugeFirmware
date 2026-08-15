@@ -31,6 +31,7 @@ public:
 	ActionResult horizontalEncoderAction(int32_t offset) override;
 	int32_t getLengthChopAmount(int32_t square);
 	int32_t getLengthExtendAmount(int32_t square);
+	void doubleClipLengthAction();
 	void focusRegained() override;
 	ActionResult buttonAction(deluge::hid::Button b, bool on, bool inCardRoutine) override;
 

@@ -100,6 +100,7 @@ bool LoadInstrumentPresetUI::opened() {
 
 	// explicit fallthrough cases
 	case OutputType::AUDIO:
+	case OutputType::AUDIO_FX:
 	case OutputType::SYNTH:
 	case OutputType::KIT:
 	case OutputType::NONE:;
@@ -181,6 +182,7 @@ Error LoadInstrumentPresetUI::setupForOutputType() {
 				break;
 			// explicit fallthrough cases
 			case OutputType::AUDIO:
+			case OutputType::AUDIO_FX:
 			case OutputType::CV:
 			case OutputType::NONE:;
 			}
