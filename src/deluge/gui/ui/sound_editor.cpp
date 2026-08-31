@@ -46,6 +46,7 @@
 #include "model/note/note_row.h"
 #include "model/settings/runtime_feature_settings.h"
 #include "model/song/song.h"
+#include "modulation/macros/macros.h"
 #include "processing/engines/audio_engine.h"
 #include "processing/sound/sound_drum.h"
 #include "processing/sound/sound_instrument.h"
@@ -831,6 +832,10 @@ void SoundEditor::updatePadLightsFor(MenuItem* currentItem) {
 		else if (getCurrentClip()->type == ClipType::AUDIO) {
 			setupShortcutsBlinkFromTable(currentItem, paramShortcutsForAudioClips);
 		}
+		// FX clips use the song-view menus/shortcuts (they edit the song-master FX chain)
+		else if (getCurrentClip()->type == ClipType::FX) {
+			setupShortcutsBlinkFromTable(currentItem, paramShortcutsForSongView);
+		}
 		// Or for Gate drums
 		else if (editingGateDrumRow()) {
 			for (int32_t y = 0; y < kDisplayHeight; y++) {
@@ -1167,6 +1172,18 @@ ActionResult SoundEditor::potentialShortcutPadAction(int32_t x, int32_t y, bool 
 
 			if (x <= 14) {
 				item = paramShortcutsForAudioClips[x][y];
+			}
+
+			goto doSetup;
+		}
+
+		// FX clips edit the song-master FX chain, so their shortcuts are the song-view ones (their
+		// root menu is soundEditorRootMenuSongView too). Without this they'd fall into the synth
+		// shortcut table below, whose menu items cast the ModControllable to Sound - crash.
+		else if (getCurrentClip()->type == ClipType::FX) {
+
+			if (x <= (kDisplayWidth - 2)) {
+				item = paramShortcutsForSongView[x][y];
 			}
 
 			goto doSetup;
@@ -1577,6 +1594,11 @@ bool SoundEditor::midiCCReceived(MIDICable& cable, uint8_t channel, uint8_t ccNu
 		return true;
 	}
 
+	// Let the focused menu item follow this CC live (e.g. macro From/To dials track the dest knob).
+	if (getCurrentMenuItem()->liveEditFromMidiCC(ccNumber, value)) {
+		return true;
+	}
+
 	return false;
 }
 
@@ -1762,6 +1784,12 @@ doMIDIOrCV:
 				else {
 					newItem = (outputType == OutputType::KIT) ? &soundEditorRootMenuDrum : &soundEditorRootMenu;
 				}
+			}
+
+			else if (clip->type == ClipType::FX) {
+				// FX clips edit the song master FX chain, so they get the song FX surface -
+				// plus the Macros menu (an FXOutput hosts GLOBAL macros like an audio clip)
+				newItem = &soundEditorRootMenuFXClip;
 			}
 
 			else {
@@ -2075,6 +2103,11 @@ std::optional<std::span<HorizontalMenu* const>> SoundEditor::getCurrentHorizonta
 		return std::nullopt;
 	}
 	if (!rootUIIsClipMinderScreen()) {
+		return horizontalMenusChainForSong;
+	}
+	// FX clips edit the song-master FX chain, so they get the song horizontal menus - their param
+	// shortcuts are the song-view menu items, which only the song chain contains
+	if (Clip* clip = getCurrentClip(); clip != nullptr && clip->type == ClipType::FX) {
 		return horizontalMenusChainForSong;
 	}
 	if (editingKitAffectEntire()) {

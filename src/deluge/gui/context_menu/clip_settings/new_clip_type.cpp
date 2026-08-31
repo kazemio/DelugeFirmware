@@ -27,7 +27,7 @@
 
 namespace deluge::gui::context_menu::clip_settings {
 
-constexpr size_t kNumValues = 5;
+constexpr size_t kNumValues = 6;
 
 NewClipType newClipType{};
 
@@ -48,6 +48,7 @@ std::span<char const*> NewClipType::getOptions() {
 	    "Kit",   // kit
 	    "MIDI",  // midi
 	    "CV",    // cv
+	    "FX",    // master FX
 	};
 	return {optionsls, kNumValues};
 }
@@ -90,6 +91,9 @@ void NewClipType::updateSelectedOption() {
 	case OutputType::CV:
 		currentOption = 4;
 		break;
+	case OutputType::AUDIO_FX:
+		currentOption = 5;
+		break;
 	default:
 		break;
 	}
@@ -122,6 +126,9 @@ void NewClipType::updateOutputToCreate() {
 	else if (currentOption == 4) {
 		toCreate = OutputType::CV;
 	}
+	else if (currentOption == 5) {
+		toCreate = OutputType::AUDIO_FX;
+	}
 }
 
 bool NewClipType::acceptCurrentOption() {
@@ -142,6 +149,9 @@ bool NewClipType::acceptCurrentOption() {
 	}
 	else if (currentOption == 4) {
 		b = CV;
+	}
+	else { // FX - no dedicated button, accepted via the select encoder like Audio
+		b = SELECT_ENC;
 	}
 
 	sessionView.clipCreationButtonPressed(b, 1, sdRoutineLock); // let the grid handle this
@@ -174,7 +184,7 @@ ActionResult NewClipType::buttonAction(deluge::hid::Button b, bool on, bool inCa
 }
 
 LED NewClipType::getLedFromOption(int32_t option) {
-	if (option == 0) {
+	if (option == 0 || option == 5) {
 		return IndicatorLED::CROSS_SCREEN_EDIT; // not actually using this, but return something
 	}
 	else if (option == 1) {
@@ -192,15 +202,15 @@ LED NewClipType::getLedFromOption(int32_t option) {
 }
 
 void NewClipType::disableLedForOption(int32_t option) {
-	if (option == 0) {
-		return; // nothing to do for audio
+	if (option == 0 || option == 5) {
+		return; // nothing to do for audio / FX
 	}
 	indicator_leds::setLedState(getLedFromOption(option), false, false);
 }
 
 void NewClipType::blinkLedForOption(int32_t option) {
-	if (option == 0) {
-		return; // nothing to do for audio
+	if (option == 0 || option == 5) {
+		return; // nothing to do for audio / FX
 	}
 	indicator_leds::blinkLed(getLedFromOption(option));
 }

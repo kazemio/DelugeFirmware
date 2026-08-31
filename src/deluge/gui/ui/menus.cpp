@@ -5,6 +5,7 @@
 #include "gui/menu_item/arpeggiator/chord_type.h"
 #include "gui/menu_item/arpeggiator/include_in_kit_arp.h"
 #include "gui/menu_item/arpeggiator/midi_cv/gate.h"
+#include "gui/menu_item/arpeggiator/midi_cv/midi_intercept.h"
 #include "gui/menu_item/arpeggiator/midi_cv/rate.h"
 #include "gui/menu_item/arpeggiator/midi_cv/rhythm.h"
 #include "gui/menu_item/arpeggiator/midi_cv/sequence_length.h"
@@ -28,6 +29,7 @@
 #include "gui/menu_item/audio_clip/transpose.h"
 #include "gui/menu_item/audio_compressor/compressor_params.h"
 #include "gui/menu_item/audio_compressor/compressor_values.h"
+#include "gui/menu_item/audio_compressor/multiband.h"
 #include "gui/menu_item/audio_interpolation.h"
 #include "gui/menu_item/battery/level.h"
 #include "gui/menu_item/bend_range/main.h"
@@ -76,7 +78,7 @@
 #include "gui/menu_item/filter_route.h"
 #include "gui/menu_item/firmware/version.h"
 #include "gui/menu_item/flash/status.h"
-#include "gui/menu_item/fx/clipping.h"
+#include "gui/menu_item/fx/saturation.h"
 #include "gui/menu_item/gate/mode.h"
 #include "gui/menu_item/gate/off_time.h"
 #include "gui/menu_item/gate/selection.h"
@@ -88,6 +90,7 @@
 #include "gui/menu_item/keyboard/layout.h"
 #include "gui/menu_item/lfo/sync.h"
 #include "gui/menu_item/lfo/type.h"
+#include "gui/menu_item/macros/macro_target.h"
 #include "gui/menu_item/master_transpose.h"
 #include "gui/menu_item/menu_item.h"
 #include "gui/menu_item/midi/after_touch_to_mono.h"
@@ -203,6 +206,7 @@
 #include "gui/menu_item/song/midi_learn.h"
 #include "gui/menu_item/source/patched_param/modulator_feedback.h"
 #include "gui/menu_item/source/patched_param/modulator_level.h"
+#include "gui/menu_item/spectrum/analyzer.h"
 #include "gui/menu_item/stem_export/start.h"
 #include "gui/menu_item/stutter/direction.h"
 #include "gui/menu_item/stutter/quantized.h"
@@ -212,6 +216,7 @@
 #include "gui/menu_item/submenu/actual_source.h"
 #include "gui/menu_item/submenu/arp_mpe_submenu.h"
 #include "gui/menu_item/submenu/bend.h"
+#include "gui/menu_item/submenu/compressor.h"
 #include "gui/menu_item/submenu/mod_fx.h"
 #include "gui/menu_item/submenu/modulator.h"
 #include "gui/menu_item/swing/interval.h"
@@ -287,6 +292,9 @@ PLACE_SDRAM_BSS arpeggiator::midi_cv::SequenceLength arpSequenceLengthMenuMIDIOr
 
 PLACE_SDRAM_BSS arpeggiator::IncludeInKitArp arpIncludeInKitArpMenu{STRING_FOR_INCLUDE_IN_KIT_ARP,
                                                                     STRING_FOR_INCLUDE_IN_KIT_ARP};
+
+// MIDI/CV only: intercept arp-mapped MIDI-follow CCs to control the local arp instead of passing them through
+arpeggiator::midi_cv::MidiIntercept arpMidiInterceptMenu{STRING_FOR_ARP_MIDI_INTERCEPT, STRING_FOR_ARP_MIDI_INTERCEPT};
 
 // Randomizer ---------------------------------
 PLACE_SDRAM_BSS randomizer::RandomizerLock randomizerLockMenu{STRING_FOR_RANDOMIZER_LOCK,
@@ -427,6 +435,8 @@ PLACE_SDRAM_BSS Submenu arpMenuMIDIOrCV{
         &arpPatternMenu,
         // MPE
         &arpMpeMenu,
+        // MIDI/CV only: route arp-mapped CCs to the local arp instead of passing through
+        &arpMidiInterceptMenu,
         // Include in kit arp
         &arpIncludeInKitArpMenu,
     },
@@ -515,6 +525,8 @@ PLACE_SDRAM_BSS patched_param::Integer delayRateMenu{STRING_FOR_RATE, STRING_FOR
 PLACE_SDRAM_BSS delay::PingPong delayPingPongMenu{STRING_FOR_PINGPONG, STRING_FOR_DELAY_PINGPONG};
 PLACE_SDRAM_BSS delay::Analog delayAnalogMenu{STRING_FOR_TYPE, STRING_FOR_DELAY_TYPE};
 PLACE_SDRAM_BSS delay::Sync delaySyncMenu{STRING_FOR_SYNC, STRING_FOR_DELAY_SYNC};
+PLACE_SDRAM_BSS UnpatchedParam delaySendMenu{STRING_FOR_SEND, STRING_FOR_DELAY_SEND, params::UNPATCHED_DELAY_SEND,
+                                             RenderingStyle::BAR};
 
 PLACE_SDRAM_BSS HorizontalMenu delayMenu{
     STRING_FOR_DELAY,
@@ -524,6 +536,7 @@ PLACE_SDRAM_BSS HorizontalMenu delayMenu{
         &delaySyncMenu,
         &delayRateMenu,
         &delayAnalogMenu,
+        &delaySendMenu,
     },
 };
 
@@ -535,6 +548,55 @@ PLACE_SDRAM_BSS stutter::Rate stutterRateMenu{STRING_FOR_RATE, STRING_FOR_STUTTE
 PLACE_SDRAM_BSS HorizontalMenu stutterMenu{STRING_FOR_STUTTER,
                                            {&stutterRateMenu, &stutterDirectionMenu, &stutterQuantizedMenu},
                                            HorizontalMenu::Layout::FIXED};
+
+// DOTT (Multiband Compressor) ---------------------------------------------------------------
+// 24 items organized for proper pagination (8 per page)
+audio_compressor::ModeZone dott_mode{STRING_FOR_COMPRESSOR_MODE, STRING_FOR_COMPRESSOR_MODE};
+audio_compressor::LinkedThreshold mb_linked_threshold{STRING_FOR_THRESHOLD, STRING_FOR_THRESHOLD};
+audio_compressor::LinkedRatio mb_linked_ratio{STRING_FOR_RATIO, STRING_FOR_RATIO};
+audio_compressor::UpDownSkew mb_up_down_skew{STRING_FOR_COMPRESSOR_UP_DOWN_SKEW, STRING_FOR_COMPRESSOR_UP_DOWN_SKEW};
+audio_compressor::LinkedAttack mb_linked_attack{STRING_FOR_ATTACK, STRING_FOR_ATTACK};
+audio_compressor::LinkedRelease mb_linked_release{STRING_FOR_RELEASE, STRING_FOR_RELEASE};
+audio_compressor::Character mb_character{STRING_FOR_COMPRESSOR_CHARACTER, STRING_FOR_COMPRESSOR_CHARACTER};
+audio_compressor::Vibe mb_vibe{STRING_FOR_COMPRESSOR_VIBE, STRING_FOR_COMPRESSOR_VIBE};
+// Per-band controls: Low
+audio_compressor::BandThreshold<0> mb_low_threshold{STRING_FOR_COMPRESSOR_LOW_THRESHOLD,
+                                                    STRING_FOR_COMPRESSOR_LOW_THRESHOLD};
+audio_compressor::BandRatio<0> mb_low_ratio{STRING_FOR_COMPRESSOR_LOW_RATIO, STRING_FOR_COMPRESSOR_LOW_RATIO};
+audio_compressor::BandBandwidth<0> mb_low_bandwidth{STRING_FOR_COMPRESSOR_LOW_BW, STRING_FOR_COMPRESSOR_LOW_BW};
+audio_compressor::BandOutputLevel<0> mb_low_output_level{STRING_FOR_COMPRESSOR_LOW_LEVEL,
+                                                         STRING_FOR_COMPRESSOR_LOW_LEVEL};
+// Per-band controls: Mid
+audio_compressor::BandThreshold<1> mb_mid_threshold{STRING_FOR_COMPRESSOR_MID_THRESHOLD,
+                                                    STRING_FOR_COMPRESSOR_MID_THRESHOLD};
+audio_compressor::BandRatio<1> mb_mid_ratio{STRING_FOR_COMPRESSOR_MID_RATIO, STRING_FOR_COMPRESSOR_MID_RATIO};
+audio_compressor::BandBandwidth<1> mb_mid_bandwidth{STRING_FOR_COMPRESSOR_MID_BW, STRING_FOR_COMPRESSOR_MID_BW};
+audio_compressor::BandOutputLevel<1> mb_mid_output_level{STRING_FOR_COMPRESSOR_MID_LEVEL,
+                                                         STRING_FOR_COMPRESSOR_MID_LEVEL};
+// Per-band controls: High
+audio_compressor::BandThreshold<2> mb_high_threshold{STRING_FOR_COMPRESSOR_HIGH_THRESHOLD,
+                                                     STRING_FOR_COMPRESSOR_HIGH_THRESHOLD};
+audio_compressor::BandRatio<2> mb_high_ratio{STRING_FOR_COMPRESSOR_HIGH_RATIO, STRING_FOR_COMPRESSOR_HIGH_RATIO};
+audio_compressor::BandBandwidth<2> mb_high_bandwidth{STRING_FOR_COMPRESSOR_HIGH_BW, STRING_FOR_COMPRESSOR_HIGH_BW};
+audio_compressor::BandOutputLevel<2> mb_high_output_level{STRING_FOR_COMPRESSOR_HIGH_LEVEL,
+                                                          STRING_FOR_COMPRESSOR_HIGH_LEVEL};
+// Global controls at end
+audio_compressor::LowCrossover comp_low_xover{STRING_FOR_COMPRESSOR_LOW_CROSSOVER, STRING_FOR_COMPRESSOR_LOW_CROSSOVER};
+audio_compressor::HighCrossover comp_high_xover{STRING_FOR_COMPRESSOR_HIGH_CROSSOVER,
+                                                STRING_FOR_COMPRESSOR_HIGH_CROSSOVER};
+audio_compressor::OutputGain mb_output_gain{STRING_FOR_COMPRESSOR_OUTPUT_GAIN, STRING_FOR_COMPRESSOR_OUTPUT_GAIN};
+audio_compressor::MultibandBlend mb_blend{STRING_FOR_BLEND, STRING_FOR_BLEND};
+
+submenu::CompressorHorizontalMenu dott_menu{
+    STRING_FOR_DOTT,
+    {
+        &dott_mode,           &mb_linked_threshold, &mb_linked_ratio,  &mb_up_down_skew,   &mb_linked_attack,
+        &mb_linked_release,   &mb_character,        &mb_vibe,          &mb_low_threshold,  &mb_low_ratio,
+        &mb_low_bandwidth,    &mb_low_output_level, &mb_mid_threshold, &mb_mid_ratio,      &mb_mid_bandwidth,
+        &mb_mid_output_level, &mb_high_threshold,   &mb_high_ratio,    &mb_high_bandwidth, &mb_high_output_level,
+        &comp_low_xover,      &comp_high_xover,     &mb_output_gain,   &mb_blend,
+    },
+    HorizontalMenu::Layout::DYNAMIC};
 
 // Bend Ranges -------------------------------------------------------------------------------
 
@@ -629,7 +691,7 @@ PLACE_SDRAM_BSS HorizontalMenu routingHorizontal{STRING_FOR_FILTER_ROUTE, {&filt
 PLACE_SDRAM_BSS HorizontalMenuGroup filtersMenuGroup{{&lpfMenu, &hpfMenu, &routingHorizontal}};
 
 // FX ----------------------------------------------------------------------------------------
-PLACE_SDRAM_BSS fx::Clipping clippingMenu{STRING_FOR_SATURATION};
+PLACE_SDRAM_BSS fx::Saturation clippingMenu{STRING_FOR_SATURATION, params::UNPATCHED_SATURATION, RenderingStyle::BAR};
 PLACE_SDRAM_BSS UnpatchedParam srrMenu{STRING_FOR_DECIMATION, params::UNPATCHED_SAMPLE_RATE_REDUCTION,
                                        RenderingStyle::BAR};
 PLACE_SDRAM_BSS UnpatchedParam bitcrushMenu{STRING_FOR_BITCRUSH, params::UNPATCHED_BITCRUSHING, RenderingStyle::BAR};
@@ -775,6 +837,7 @@ PLACE_SDRAM_BSS HorizontalMenu globalDelayMenu{
         &delaySyncMenu,
         &globalDelayRateMenu,
         &delayAnalogMenu,
+        &delaySendMenu,
     },
 };
 
@@ -837,8 +900,9 @@ PLACE_SDRAM_BSS submenu::ModFxHorizontalMenu globalModFXMenu{
 PLACE_SDRAM_BSS HorizontalMenu globalDistortionMenu{
     STRING_FOR_DISTORTION,
     {
-        &srrMenu,
+        &clippingMenu,
         &bitcrushMenu,
+        &srrMenu,
     },
 };
 
@@ -851,6 +915,7 @@ PLACE_SDRAM_BSS Submenu globalFXMenu{
         &stutterMenu,
         &globalModFXMenu,
         &globalDistortionMenu,
+        &dott_menu,
     },
 };
 
@@ -923,6 +988,7 @@ PLACE_SDRAM_BSS Submenu audioClipFXMenu{
         &stutterMenu,
         &globalModFXMenu,
         &audioClipDistortionMenu,
+        &dott_menu,
     },
 };
 
@@ -1050,6 +1116,8 @@ PLACE_SDRAM_BSS flash::Status flashStatusMenu{STRING_FOR_PLAY_CURSOR};
 PLACE_SDRAM_BSS firmware::Version firmwareVersionMenu{STRING_FOR_FIRMWARE_VERSION, STRING_FOR_FIRMWARE_VER_MENU_TITLE};
 
 PLACE_SDRAM_BSS battery::Level batteryLevelMenu{STRING_FOR_BATTERY_LEVEL, STRING_FOR_BATTERY_LEVEL_MENU_TITLE};
+
+PLACE_SDRAM_BSS spectrum::Analyzer spectrumAnalyzerMenu{STRING_FOR_SPECTRUM, STRING_FOR_SPECTRUM};
 
 PLACE_SDRAM_BSS runtime_feature::Settings runtimeFeatureSettingsMenu{STRING_FOR_COMMUNITY_FTS,
                                                                      STRING_FOR_COMMUNITY_FTS_MENU_TITLE};
@@ -1183,6 +1251,60 @@ PLACE_SDRAM_BSS Submenu midiCommandsMenu{
      &redoMidiCommand, &loopMidiCommand, &loopContinuousLayeringMidiCommand, &fillMidiCommand, &transposeMidiCommand,
      &nextSongMidiCommand, &shiftMidiCommand},
 };
+
+// macro submenu - 4 groups, each a learnable source CC fanning out to 8 destinations.
+// Each destination is a horizontal menu page of three columns (Dest | From | To); the 8 pages
+// are bundled into a HorizontalMenuGroup so you flip between destinations 1-8 from one page.
+
+// Declares the Dest/From/To column items plus the horizontal page for macro m's target f.
+#define MACRO_TARGET(m, f)                                                                                             \
+	macros::MacroTarget macro##m##Target##f##Dest{STRING_FOR_MACRO_TARGET_DEST, (m) - 1, (f) - 1};                     \
+	macros::MacroTargetRange macro##m##Target##f##From{STRING_FOR_MACRO_FROM, (m) - 1, (f) - 1,                        \
+	                                                   macros::MacroTargetRange::FROM};                                \
+	macros::MacroTargetRange macro##m##Target##f##To{STRING_FOR_MACRO_TO, (m) - 1, (f) - 1,                            \
+	                                                 macros::MacroTargetRange::TO};                                    \
+	HorizontalMenu macro##m##TargetPage##f {                                                                           \
+		STRING_FOR_MACRO_TARGET_##f, {                                                                                 \
+			&macro##m##Target##f##Dest, &macro##m##Target##f##From, &macro##m##Target##f##To                           \
+		}                                                                                                              \
+	}
+
+// Declares macro m's master enable, learnable source, 8 target pages and the macro submenu.
+#define DEFINE_MACRO(m)                                                                                                \
+	macros::MacroActive macro##m##Active{STRING_FOR_MACRO_ACTIVE, (m) - 1};                                            \
+	macros::MacroSource macro##m##Source{STRING_FOR_MACRO_SOURCE, (m) - 1};                                            \
+	MACRO_TARGET(m, 1);                                                                                                \
+	MACRO_TARGET(m, 2);                                                                                                \
+	MACRO_TARGET(m, 3);                                                                                                \
+	MACRO_TARGET(m, 4);                                                                                                \
+	MACRO_TARGET(m, 5);                                                                                                \
+	MACRO_TARGET(m, 6);                                                                                                \
+	MACRO_TARGET(m, 7);                                                                                                \
+	MACRO_TARGET(m, 8);                                                                                                \
+	HorizontalMenuGroup macro##m##Targets{STRING_FOR_MACRO_TARGETS,                                                    \
+	                                      {&macro##m##TargetPage1, &macro##m##TargetPage2, &macro##m##TargetPage3,     \
+	                                       &macro##m##TargetPage4, &macro##m##TargetPage5, &macro##m##TargetPage6,     \
+	                                       &macro##m##TargetPage7, &macro##m##TargetPage8}};                           \
+	Submenu macro##m##Menu {                                                                                           \
+		STRING_FOR_MACRO_##m, {                                                                                        \
+			&macro##m##Active, &macro##m##Source, &macro##m##Targets                                                   \
+		}                                                                                                              \
+	}
+
+DEFINE_MACRO(1);
+DEFINE_MACRO(2);
+DEFINE_MACRO(3);
+DEFINE_MACRO(4);
+#undef DEFINE_MACRO
+#undef MACRO_TARGET
+
+macros::MacroMenu macrosMenu{
+    STRING_FOR_MACRO,
+    STRING_FOR_MACROS,
+    {&macro1Menu, &macro2Menu, &macro3Menu, &macro4Menu},
+};
+// indexed by macro, for jumping straight to a macro's learn page from its automation lane
+MenuItem* macroSourceMenuItems[4] = {&macro1Source, &macro2Source, &macro3Source, &macro4Source};
 
 // MIDI device submenu - for after we've selected which device we want it for
 
@@ -1501,6 +1623,7 @@ PLACE_SDRAM_BSS Submenu soundFXMenu{
         &modFXMenu,
         &soundDistortionMenu,
         &noiseMenu,
+        &dott_menu,
     },
 };
 
@@ -1544,6 +1667,8 @@ PLACE_SDRAM_BSS Submenu soundEditorRootMenu{
         &patchCablesMenu,
         &sequenceDirectionMenu,
         &outputMidiSubmenu,
+        &macrosMenu,
+        &spectrumAnalyzerMenu,
     },
 };
 
@@ -1705,6 +1830,7 @@ PLACE_SDRAM_BSS menu_item::Submenu soundEditorRootMenuMIDIOrCV{
         &mpeyToModWheelMenu,
         &midiMPEMenu,
         &sequenceDirectionMenu,
+        &macrosMenu,
     },
 };
 
@@ -1741,6 +1867,8 @@ PLACE_SDRAM_BSS menu_item::Submenu soundEditorRootMenuAudioClip{
         &audioClipSampleMenu,
         &audioClipAttackMenu,
         &priorityMenu,
+        &macrosMenu,
+        &spectrumAnalyzerMenu,
     },
 };
 
@@ -1837,6 +1965,21 @@ PLACE_SDRAM_BSS menu_item::Submenu soundEditorRootMenuSongView{
         &configureSongMacrosMenu,
         &midiLearnMenu,
         &stemExportMenu,
+        &spectrumAnalyzerMenu,
+    },
+};
+
+// Root menu for FX clips: the song FX surface their ParamManager drives, plus the (track) Macros
+// menu - an FXOutput is a GLOBAL macro host like an audio clip. Separate from the song-view root so
+// the Macros entry never appears in real song/arranger menu contexts.
+menu_item::Submenu soundEditorRootMenuFXClip{
+    STRING_FOR_SONG,
+    {
+        &songMasterMenu,
+        &globalFiltersMenu,
+        &globalFXMenu,
+        &macrosMenu,
+        &spectrumAnalyzerMenu,
     },
 };
 
@@ -1888,6 +2031,7 @@ PLACE_SDRAM_BSS menu_item::Submenu soundEditorRootMenuKitGlobalFX{
         &globalFiltersMenu,
         &globalFXMenu,
         &globalSidechainMenu,
+        &spectrumAnalyzerMenu,
     },
 };
 
@@ -1930,7 +2074,7 @@ PLACE_SDRAM_DATA MenuItem* paramShortcutsForSounds[][kDisplayHeight] = {
     {&arpRateMenu,			&arpSyncMenu,				&arpGateMenu,                   &arpOctavesMenu,                &arpPresetModeMenu,		&editNameMenu,				&trebleMenu,					&trebleFreqMenu                    },
     {&lfo1RateMenu,			&lfo1SyncMenu,				&lfo1TypeMenu,                  &modFXTypeMenu,                 &modFXOffsetMenu,		&modFXFeedbackMenu,			&modFXDepthMenu,				&modFXRateMenu                     },
     {&lfo2RateMenu,			&lfo2SyncMenu,				&lfo2TypeMenu,                  &reverbAmountMenu,              &reverbPanMenu,			&reverbWidthMenu,			&reverbDampingMenu,				&reverbRoomSizeMenu                },
-    {&delayRateMenu,			&delaySyncMenu,				&delayAnalogMenu,               &delayFeedbackMenu,             &delayPingPongMenu,		nullptr,					nullptr,						nullptr                            },
+    {&delayRateMenu,			&delaySyncMenu,				&delayAnalogMenu,               &delayFeedbackMenu,             &delayPingPongMenu,		&delaySendMenu,				nullptr,						nullptr                            },
     {nullptr,				&spreadVelocityMenu,		&randomizerLockMenu,            &randomizerNoteProbabilityMenu,        nullptr,				nullptr,					nullptr,						nullptr                            },
 };
 
@@ -1949,7 +2093,7 @@ PLACE_SDRAM_DATA MenuItem* paramShortcutsForSoundsSecondLayer[][kDisplayHeight] 
     {nullptr,	        nullptr,	            nullptr,	        nullptr,	        nullptr,					nullptr,	nullptr,	nullptr              },
     {&lfo3RateMenu,	    &lfo3SyncMenu,	        &lfo3TypeMenu,	    nullptr,	        nullptr,	                nullptr,	nullptr,	nullptr              },
     {&lfo4RateMenu,	    &lfo4SyncMenu,	        &lfo4TypeMenu,	    nullptr,	        nullptr,	                nullptr,	nullptr,	nullptr              },
-    {nullptr,	        nullptr,	            nullptr,	        nullptr,	        nullptr,                    nullptr,	nullptr,	nullptr              },
+    {nullptr,	        nullptr,	            nullptr,	        &delaySendMenu,	    nullptr,                    nullptr,	nullptr,	nullptr              },
     {nullptr,	        nullptr,	            nullptr,	        nullptr,	        nullptr,                    nullptr,	nullptr,	nullptr              },
 };
 
@@ -1968,7 +2112,7 @@ PLACE_SDRAM_DATA MenuItem* paramShortcutsForAudioClips[kDisplayWidth][kDisplayHe
     {nullptr,                 nullptr,                 nullptr,                    nullptr,                     nullptr,              &editNameMenu,      &trebleMenu,              &trebleFreqMenu                    },
     {nullptr,                 nullptr,                 nullptr,                    &modFXTypeMenu,              &modFXOffsetMenu,     &modFXFeedbackMenu, &globalModFXDepthMenu,    &globalModFXRateMenu               },
     {nullptr,                 nullptr,                 nullptr,                    &globalReverbSendAmountMenu, &reverbPanMenu,       &reverbWidthMenu,   &reverbDampingMenu,       &reverbRoomSizeMenu                },
-    {&globalDelayRateMenu,    &delaySyncMenu,          &delayAnalogMenu,           &globalDelayFeedbackMenu,    &delayPingPongMenu,   nullptr,            nullptr,                  nullptr                            },
+    {&globalDelayRateMenu,    &delaySyncMenu,          &delayAnalogMenu,           &globalDelayFeedbackMenu,    &delayPingPongMenu,   &delaySendMenu,     nullptr,                  nullptr                            },
     {nullptr,                 nullptr,                 nullptr,                    nullptr,                     nullptr,              nullptr,            nullptr,                  nullptr                            },
 };
 
@@ -1979,7 +2123,7 @@ PLACE_SDRAM_DATA MenuItem* paramShortcutsForSongView[][kDisplayHeight] = {
     {nullptr,                 nullptr,                 nullptr,                        nullptr,                        nullptr,              nullptr,                nullptr,                  nullptr                            },
     {nullptr,                 nullptr,                 nullptr,                        nullptr,                        nullptr,              nullptr,                nullptr,                  nullptr                            },
     {nullptr,                 nullptr,                 nullptr,                        nullptr,                        nullptr,              nullptr,                nullptr,                  &stutterRateMenu                   },
-    {&globalLevelMenu,        nullptr,                 nullptr,                        &globalPanMenu,                 nullptr,              &srrMenu,               &bitcrushMenu,            nullptr                            },
+    {&globalLevelMenu,        nullptr,                 nullptr,                        &globalPanMenu,                 nullptr,              &srrMenu,               &bitcrushMenu,            &clippingMenu                      },
     {nullptr,                 nullptr,                 nullptr,                        nullptr,                        nullptr,              &threshold,             nullptr,                  nullptr                            },
     {nullptr,                 nullptr,                 nullptr,                        nullptr,                        &globalLPFMorphMenu,  &lpfModeMenu,           &globalLPFResMenu,        &globalLPFFreqMenu                 },
     {nullptr,                 nullptr,                 nullptr,                        nullptr,                        &globalHPFMorphMenu,  &hpfModeMenu,           &globalHPFResMenu,        &globalHPFFreqMenu                 },
@@ -1987,7 +2131,7 @@ PLACE_SDRAM_DATA MenuItem* paramShortcutsForSongView[][kDisplayHeight] = {
     {nullptr,                 nullptr,                 nullptr,                        nullptr,                        nullptr,              nullptr,                &trebleMenu,              &trebleFreqMenu                    },
     {nullptr,                 nullptr,                 nullptr,                        &modFXTypeMenu,                 &modFXOffsetMenu,     &modFXFeedbackMenu,     &globalModFXDepthMenu,    &globalModFXRateMenu               },
     {nullptr,                 nullptr,                 nullptr,                        &globalReverbSendAmountMenu,    &reverbPanMenu,       &reverbWidthMenu,       &reverbDampingMenu,       &reverbRoomSizeMenu                },
-    {&globalDelayRateMenu,    &delaySyncMenu,          &delayAnalogMenu,               &globalDelayFeedbackMenu,       &delayPingPongMenu,   nullptr,                nullptr,                  nullptr                            },
+    {&globalDelayRateMenu,    &delaySyncMenu,          &delayAnalogMenu,               &globalDelayFeedbackMenu,       &delayPingPongMenu,   &delaySendMenu,         nullptr,                  nullptr                            },
     {nullptr,          	      nullptr,                 nullptr,                        nullptr,                        nullptr,              nullptr,                nullptr,                  nullptr                            },
 };
 
@@ -1998,7 +2142,7 @@ PLACE_SDRAM_DATA MenuItem* paramShortcutsForKitGlobalFX[][kDisplayHeight] = {
     {nullptr,                 nullptr,                 nullptr,                        nullptr,                        nullptr,                     nullptr,                nullptr,                  nullptr                            },
     {nullptr,                 nullptr,                 nullptr,                        nullptr,                        nullptr,                     nullptr,                nullptr,                  nullptr                            },
     {nullptr,                 nullptr,                 nullptr,                        nullptr,                        nullptr,                     nullptr,                nullptr,                  nullptr             				 },
-    {&globalLevelMenu,        &globalPitchMenu,        nullptr,                        &globalPanMenu,                 nullptr,                     &srrMenu,               &bitcrushMenu,            nullptr                            },
+    {&globalLevelMenu,        &globalPitchMenu,        nullptr,                        &globalPanMenu,                 nullptr,                     &srrMenu,               &bitcrushMenu,            &clippingMenu                      },
     {nullptr,              	 nullptr,                 nullptr,                        nullptr,                        nullptr,                     &threshold,             nullptr,                  nullptr                            },
     {nullptr,                 nullptr,                 nullptr,                        nullptr,                        &globalLPFMorphMenu,         &lpfModeMenu,           &globalLPFResMenu,        &globalLPFFreqMenu                 },
     {nullptr,                 nullptr,                 nullptr,                        nullptr,                        &globalHPFMorphMenu,         &hpfModeMenu,           &globalHPFResMenu,        &globalHPFFreqMenu                 },
@@ -2006,7 +2150,7 @@ PLACE_SDRAM_DATA MenuItem* paramShortcutsForKitGlobalFX[][kDisplayHeight] = {
     {&arpRateMenu,            &arpSyncMenu,            &arpGateMenu,                   &arpOctavesMenu,                &arpPresetModeMenu,          &editNameMenu,          &trebleMenu,              &trebleFreqMenu                    },
     {nullptr,                 nullptr,                 nullptr,                        &modFXTypeMenu,                 &modFXOffsetMenu,            &modFXFeedbackMenu,     &globalModFXDepthMenu,    &globalModFXRateMenu               },
     {nullptr,                 nullptr,                 nullptr,                        &globalReverbSendAmountMenu,    &reverbPanMenu,              &reverbWidthMenu,       &reverbDampingMenu,       &reverbRoomSizeMenu                },
-    {&globalDelayRateMenu,    &delaySyncMenu,          &delayAnalogMenu,               &globalDelayFeedbackMenu,       &delayPingPongMenu,          nullptr,                nullptr,                  nullptr                            },
+    {&globalDelayRateMenu,    &delaySyncMenu,          &delayAnalogMenu,               &globalDelayFeedbackMenu,       &delayPingPongMenu,          &delaySendMenu,         nullptr,                  nullptr                            },
     {nullptr,          	     &spreadVelocityMenu,	  &randomizerLockMenu,            &randomizerNoteProbabilityMenu,        nullptr,                     nullptr,                nullptr,                  nullptr                            },
 };
 
@@ -2023,7 +2167,7 @@ PLACE_SDRAM_BSS deluge::vector<HorizontalMenu*> horizontalMenusChainForKit = {
 	&kitClipMasterMenu,
 	&globalFiltersMenuGroup, &globalEQMenu, &globalModFXMenu,
 	&globalReverbMenuGroup, &globalDelayMenu, &globalDistortionMenu,
-	&globalSidechainMenu, &audioCompMenu, &stutterMenu,
+	&dott_menu, &globalSidechainMenu, &audioCompMenu, &stutterMenu,
 	&arpMenuGroupKit, &randomizerMenu
 };
 
@@ -2031,14 +2175,14 @@ PLACE_SDRAM_BSS deluge::vector<HorizontalMenu*> horizontalMenusChainForSong = {
 	&songMasterMenu,
 	&globalFiltersMenuGroup, &globalEQMenu, &globalModFXMenu,
 	&globalReverbMenuGroup, &globalDelayMenu, &globalDistortionMenu,
-	&audioCompMenu, &stutterMenu
+	&dott_menu, &audioCompMenu, &stutterMenu
 };
 
 PLACE_SDRAM_BSS deluge::vector<HorizontalMenu*> horizontalMenusChainForAudioClip = {
 	&audioClipMasterMenu, &audioClipSampleMenu,
 	&globalFiltersMenuGroup, &eqMenu, &globalModFXMenu,
 	&globalReverbMenuGroup, &globalDelayMenu, &audioClipDistortionMenu,
-	&globalSidechainMenu, &audioCompMenu, &stutterMenu
+	&dott_menu, &globalSidechainMenu, &audioCompMenu, &stutterMenu
 };
 
 PLACE_SDRAM_BSS deluge::vector<HorizontalMenu*> horizontalMenusChainForMidiOrCv = {

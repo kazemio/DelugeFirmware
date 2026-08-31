@@ -15,61 +15,38 @@
  * If not, see <https://www.gnu.org/licenses/>.
  */
 #pragma once
-#include "gui/menu_item/sync_level.h"
-#include "gui/ui/sound_editor.h"
-#include "model/drum/drum.h"
-#include "model/instrument/kit.h"
-#include "model/song/song.h"
-#include "processing/sound/sound.h"
-#include "processing/sound/sound_drum.h"
+#include "gui/menu_item/formatted_title.h"
+#include "gui/menu_item/unpatched_param.h"
+#include "model/sync.h"
 
 namespace deluge::gui::menu_item::lfo {
 
-class Sync final : public SyncLevel, FormattedTitle {
+// LFO sync, backed by the UNPATCHED_LFOn_SYNC params (which makes it automatable and CC-controllable).
+// The menu value is the "sync value" 0..NUM_SYNC_VALUES-1 (0 = OFF, i.e. free-running rate param);
+// see lfoSyncValueToParamValue() for the stored full-range encoding.
+class Sync final : public UnpatchedParam, public FormattedTitle {
 public:
 	Sync(l10n::String name, l10n::String title, uint8_t lfoId)
-	    : SyncLevel(name, title), FormattedTitle(title, lfoId + 1), lfoId_(lfoId) {}
+	    : UnpatchedParam(name, title, deluge::modulation::params::UNPATCHED_LFO1_SYNC + lfoId),
+	      FormattedTitle(title, lfoId + 1), lfoId_(lfoId) {}
 
 	[[nodiscard]] std::string_view getTitle() const override { return FormattedTitle::title(); }
 
-	void readCurrentValue() override {
-		this->setValue(syncTypeAndLevelToMenuOption(soundEditor.currentSound->lfoConfig[lfoId_].syncType,
-		                                            soundEditor.currentSound->lfoConfig[lfoId_].syncLevel));
-	}
-	bool usesAffectEntire() override { return true; }
-	void writeCurrentValue() override {
-		int32_t current_value = this->getValue();
-		// If affect-entire button held, do whole kit
-		if (currentUIMode == UI_MODE_HOLDING_AFFECT_ENTIRE_IN_SOUND_EDITOR && soundEditor.editingKitRow()) {
+	[[nodiscard]] int32_t getMinValue() const override { return 0; }
+	[[nodiscard]] int32_t getMaxValue() const override { return NUM_SYNC_VALUES - 1; }
 
-			Kit* kit = getCurrentKit();
+	void readCurrentValue() override;
+	void getColumnLabel(StringBuf& label) override;
+	void renderInHorizontalMenu(const SlotPosition& slot) override;
+	void getNotificationValue(StringBuf& value) override;
 
-			for (Drum* thisDrum = kit->firstDrum; thisDrum != nullptr; thisDrum = thisDrum->next) {
-				if (thisDrum->type == DrumType::SOUND) {
-					auto* soundDrum = static_cast<SoundDrum*>(thisDrum);
-					soundDrum->lfoConfig[lfoId_].syncType = syncValueToSyncType(current_value);
-					soundDrum->lfoConfig[lfoId_].syncLevel = syncValueToSyncLevel(current_value);
-					// This fires unnecessarily for LFO2 assignments as well, but that's ok. It's not
-					// entirely clear if we really need this for the LFO1, even: maybe the clock-driven resyncs
-					// would be enough?
-					soundDrum->resyncGlobalLFOs();
-					soundDrum->setupPatchingForAllParamManagers(currentSong);
-				}
-			}
-		}
-		// Or, the normal case of just one sound
-		else {
-			soundEditor.currentSound->lfoConfig[lfoId_].syncType = syncValueToSyncType(current_value);
-			soundEditor.currentSound->lfoConfig[lfoId_].syncLevel = syncValueToSyncLevel(current_value);
-			// This fires unnecessarily for LFO2 assignments as well, but that's ok. It's not
-			// entirely clear if we really need this for the LFO1, even: maybe the clock-driven resyncs
-			// would be enough?
-			soundEditor.currentSound->resyncGlobalLFOs();
-			soundEditor.currentSound->setupPatchingForAllParamManagers(currentSong);
-		}
-	}
+protected:
+	int32_t getFinalValue() override;
+	void drawValue() override;
+	void drawPixelsForOled() override;
 
 private:
+	void getNoteLengthName(StringBuf& buffer);
 	uint8_t lfoId_;
 };
 
