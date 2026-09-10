@@ -235,6 +235,7 @@ enum class OutputType : uint8_t {
 	MIDI_OUT,
 	CV,
 	AUDIO,
+	AUDIO_FX,
 	NONE = 255,
 };
 
@@ -417,6 +418,12 @@ enum class ModFXType : uint8_t {
 	GRAIN, // Look below if you want to add another one
 };
 constexpr int32_t kNumModFXTypes = util::to_underlying(ModFXType::GRAIN) + 1;
+
+enum class CompressorMode : uint8_t {
+	SINGLE,    // Single-band compressor (traditional)
+	MULTIBAND, // 3-band OTT-style multiband compressor (DOTT)
+};
+constexpr int32_t kNumCompressorModes = util::to_underlying(CompressorMode::MULTIBAND) + 1;
 
 enum class SynthMode : uint8_t {
 	SUBTRACTIVE,
@@ -1114,6 +1121,7 @@ enum GridMode : uint8_t {
 enum class ClipType {
 	INSTRUMENT,
 	AUDIO,
+	FX,
 };
 
 enum class LaunchStyle { DEFAULT, FILL, ONCE };

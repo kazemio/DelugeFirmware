@@ -204,6 +204,22 @@ void RuntimeFeatureSettings::init() {
 	// Rounded Corners
 	SetupOnOffSetting(settings[RuntimeFeatureSettingType::RoundedCorners], STRING_FOR_COMMUNITY_FEATURE_ROUNDED_CORNERS,
 	                  "roundedCorners", RuntimeFeatureStateToggle::On);
+
+	// macro
+	SetupOnOffSetting(settings[RuntimeFeatureSettingType::MacroSystem], STRING_FOR_COMMUNITY_FEATURE_MACROS, "macros",
+	                  RuntimeFeatureStateToggle::Off);
+
+	// Filter Frequency Display
+	SetupOnOffSetting(settings[RuntimeFeatureSettingType::ShowRealUnits], STRING_FOR_COMMUNITY_FEATURE_SHOW_REAL_UNITS,
+	                  "showRealUnits", RuntimeFeatureStateToggle::Off);
+	// ModFX after DOTT (post multiband compressor)
+	SetupOnOffSetting(settings[RuntimeFeatureSettingType::ModFXPostDOTT], STRING_FOR_COMMUNITY_FEATURE_MODFX_POST_DOTT,
+	                  "modFxPostDott", RuntimeFeatureStateToggle::Off);
+
+	// Spectrum Analyzer
+	SetupOnOffSetting(settings[RuntimeFeatureSettingType::EnableSpectrumAnalyzer],
+	                  STRING_FOR_COMMUNITY_FEATURE_SPECTRUM_ANALYZER, "enableSpectrumAnalyzer",
+	                  RuntimeFeatureStateToggle::On);
 }
 
 void RuntimeFeatureSettings::factoryReset(bool showPopup) {
