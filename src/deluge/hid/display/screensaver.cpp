@@ -17,6 +17,7 @@
 
 #include "hid/display/screensaver.h"
 #include "definitions_cxx.hpp"
+#include "gui/ui/spectrum_overlay.h"
 #include "gui/ui_timer_manager.h"
 #include "hid/display/display.h"
 #include "hid/display/oled.h"
@@ -112,7 +113,13 @@ void Screensaver::timerEvent() {
 	// disable burn-in protection, which is worse than the alternative. The popup itself returns on
 	// the first input regardless, and the screensaver only appears after minutes of idle, so the
 	// window where it could cover one is short.
-	if (OLED::isPermanentPopupPresent() || OLED::isWorkingAnimationPresent() || stemExport.processStarted) {
+	//
+	// The spectrum overlay's takeover states inhibit too: watching the analyzer is a hands-off
+	// activity, and its display-off state is already burn-in protection - starting an animation
+	// over either would defeat the point. Both states end on the same physical inputs that feed
+	// noteActivity(), so neither can strand the screensaver off.
+	if (OLED::isPermanentPopupPresent() || OLED::isWorkingAnimationPresent() || stemExport.processStarted
+	    || gui::spectrum_overlay::shouldShowSpectrum() || gui::spectrum_overlay::shouldBlankDisplay()) {
 		if (active_) {
 			active_ = false;
 			OLED::markChanged();

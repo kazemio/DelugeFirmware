@@ -293,7 +293,7 @@ int32_t StemExport::disarmAllInstrumentsForStemExport(StemExportType stemExportT
 				*/
 				OutputType outputType = output->type;
 				if (!output->mutedInArrangementMode && !output->isEmpty(false) && outputType != OutputType::MIDI_OUT
-				    && outputType != OutputType::CV) {
+				    && outputType != OutputType::CV && outputType != OutputType::AUDIO_FX) {
 					output->exportStem = true;
 					totalNumStemsToExport++;
 				}
@@ -446,7 +446,8 @@ int32_t StemExport::disarmAllClipsForStemExport() {
 				    2) the output type is not MIDI or CV
 				*/
 				OutputType outputType = clip->output->type;
-				if (!clip->isEmpty(false) && outputType != OutputType::MIDI_OUT && outputType != OutputType::CV) {
+				if (!clip->isEmpty(false) && outputType != OutputType::MIDI_OUT && outputType != OutputType::CV
+				    && outputType != OutputType::AUDIO_FX) {
 					clip->exportStem = true;
 					totalNumStemsToExport++;
 				}

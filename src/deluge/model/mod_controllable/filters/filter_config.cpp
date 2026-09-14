@@ -11,6 +11,7 @@ EnumStringMap<FilterMode, kNumFilterModes> filterMap({{{FilterMode::TRANSISTOR_1
                                                        {FilterMode::SVF_BAND, "SVF_Band"},
                                                        {FilterMode::SVF_NOTCH, "SVF_Notch"},
                                                        {FilterMode::HPLADDER, "HPLadder"},
+                                                       {FilterMode::SVF_HP24, "SVF_HP24"},
                                                        {FilterMode::OFF, "Off"}}});
 
 EnumStringMap<FilterRoute, kNumFilterRoutes> routeMap({{

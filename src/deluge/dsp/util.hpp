@@ -18,6 +18,7 @@
 #pragma once
 #include "deluge/util/fixedpoint.h"
 #include "deluge/util/functions.h"
+#include <arm_neon.h>
 #include <cmath>
 
 namespace deluge::dsp {
@@ -91,4 +92,90 @@ inline void foldBuffer(q31_t* startSample, q31_t* endSample, q31_t foldLevel) {
 		currentSample += 1;
 	} while (currentSample < endSample);
 }
+/// Simple unipolar triangle - 2 segments: 0→1→0 (peak at phase=0.5)
+/// @param phase Phase in cycles (wraps automatically via floor)
+/// @param duty Active portion 0.0-1.0 (default 1.0 = full triangle, no deadzone)
+/// @return Output 0.0 to 1.0
+inline float triangleSimpleUnipolar(float phase, float duty = 1.0f) {
+	// Fast floor via int32_t truncation (valid for non-negative phase)
+	phase = phase - static_cast<float>(static_cast<int32_t>(phase));
+	float halfDuty = duty * 0.5f;
+	float invHalfDuty = 2.0f / duty; // One division instead of two
+
+	if (phase < halfDuty) {
+		return phase * invHalfDuty; // Rising: 0→1
+	}
+	else if (phase < duty) {
+		return (duty - phase) * invHalfDuty; // Falling: 1→0
+	}
+	return 0.0f; // Deadzone
+}
+
+/// Bipolar triangle - 4 segments: 0→+1→0→-1→0 (starts at 0, peak at phase=0.25)
+/// @param phase Phase in cycles (wraps automatically via floor)
+/// @param duty Active portion 0.0-1.0 (default 1.0 = full triangle, no deadzone)
+/// @return Output -1.0 to +1.0
+inline float triangleFloat(float phase, float duty = 1.0f) {
+	// Fast floor via int32_t truncation (valid for non-negative phase)
+	phase = phase - static_cast<float>(static_cast<int32_t>(phase));
+	float quarterDuty = duty * 0.25f;
+	float halfDuty = duty * 0.5f;
+
+	if (phase < quarterDuty) {
+		return phase / quarterDuty; // Rising positive: 0→+1
+	}
+	else if (phase < halfDuty) {
+		return (halfDuty - phase) / quarterDuty; // Falling positive: +1→0
+	}
+	else if (phase < halfDuty + quarterDuty) {
+		return -(phase - halfDuty) / quarterDuty; // Falling negative: 0→-1
+	}
+	else if (phase < duty) {
+		return -(duty - phase) / quarterDuty; // Rising negative: -1→0
+	}
+	return 0.0f; // Deadzone
+}
+
+/// Soft clipping function for limiting signals with smooth transition
+/// Linear soft clip: halves the excess above/below knee
+/// @param x Input sample
+/// @param knee Clipping knee point
+/// @return Soft-clipped output
+[[gnu::always_inline]] inline q31_t softClip(q31_t x, q31_t knee) {
+	if (x > knee) {
+		return knee + ((x - knee) >> 1);
+	}
+	if (x < -knee) {
+		return -knee + ((x + knee) >> 1);
+	}
+	return x;
+}
+
+/// Soft clip 4 q31 samples using NEON SIMD
+/// @param x 4 input samples as NEON vector
+/// @param knee Clipping knee point
+/// @return 4 soft-clipped samples
+[[gnu::always_inline]] inline int32x4_t softClip_NEON(int32x4_t x, int32_t knee) {
+	const int32x4_t kneeVec = vdupq_n_s32(knee);
+	const int32x4_t negKneeVec = vdupq_n_s32(-knee);
+
+	// For samples above knee: output = knee + (x - knee) / 2
+	// For samples below -knee: output = -knee + (x + knee) / 2
+
+	// Positive side: excess above knee, halved
+	int32x4_t posExcess = vqsubq_s32(x, kneeVec);
+	int32x4_t posHalf = vshrq_n_s32(posExcess, 1);
+	int32x4_t posClipped = vaddq_s32(kneeVec, posHalf);
+
+	// Negative side: excess below -knee, halved
+	int32x4_t negExcess = vqsubq_s32(x, negKneeVec);
+	int32x4_t negHalf = vshrq_n_s32(negExcess, 1);
+	int32x4_t negClipped = vaddq_s32(negKneeVec, negHalf);
+
+	// Select: use posClipped if x > knee, negClipped if x < -knee, else x
+	int32x4_t result = vminq_s32(x, posClipped);
+	result = vmaxq_s32(result, negClipped);
+	return result;
+}
+
 } // namespace deluge::dsp

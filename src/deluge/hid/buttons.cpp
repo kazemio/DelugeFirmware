@@ -19,6 +19,7 @@
 #include "definitions_cxx.hpp"
 #include "gui/ui/audio_recorder.h"
 #include "gui/ui/load/load_song_ui.h"
+#include "gui/ui/spectrum_overlay.h"
 #include "gui/ui/ui.h"
 #include "gui/ui_timer_manager.h"
 #include "gui/views/arranger_view.h"
@@ -37,6 +38,7 @@
 
 namespace Buttons {
 
+bool scaleButtonPressUsedUp;
 bool recordButtonPressUsedUp;
 uint32_t timeRecordButtonPressed;
 bool selectButtonPressUsedUp;
@@ -130,6 +132,23 @@ ActionResult buttonAction(deluge::hid::Button b, bool on, bool inCardRoutine) {
 		if (on) {
 			// The next release has a chance of toggling cross screen mode
 			considerCrossScreenReleaseForCrossScreenMode = true;
+		}
+	}
+	else if (b == SCALE_MODE) {
+		if (on) {
+			// Holding CROSS SCREEN + tapping SCALE toggles the spectrum overlay from any view.
+			// (LOAD held excluded: SCALE/CROSS SCREEN select load-pattern variants there.)
+			if (isButtonPressed(CROSS_SCREEN_EDIT) && !isButtonPressed(LOAD) && display->haveOLED()
+			    && runtimeFeatureSettings.isOn(RuntimeFeatureSettingType::EnableSpectrumAnalyzer)) {
+				scaleButtonPressUsedUp = true;
+				deluge::gui::spectrum_overlay::toggle();
+				goto dealtWith;
+			}
+			scaleButtonPressUsedUp = false;
+		}
+		else if (scaleButtonPressUsedUp) {
+			// Scale mode toggles on release in some views, so swallow the release of a combo press too.
+			goto dealtWith;
 		}
 	}
 	else if (b == SELECT_ENC) {
