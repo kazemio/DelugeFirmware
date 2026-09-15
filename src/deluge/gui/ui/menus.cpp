@@ -1780,6 +1780,8 @@ PLACE_SDRAM_BSS ToggleBool configureOfflineRenderingMenu{STRING_FOR_CONFIGURE_EX
                                                          stemExport.renderOffline};
 PLACE_SDRAM_BSS ToggleBool configureMixdownMenu{STRING_FOR_CONFIGURE_EXPORT_STEMS_MIXDOWN,
                                                 STRING_FOR_CONFIGURE_EXPORT_STEMS_MIXDOWN, stemExport.exportMixdown};
+PLACE_SDRAM_BSS ToggleBool configureKitRowsMenu{STRING_FOR_CONFIGURE_EXPORT_STEMS_KIT_ROWS,
+                                                STRING_FOR_CONFIGURE_EXPORT_STEMS_KIT_ROWS, stemExport.includeKitRows};
 PLACE_SDRAM_BSS menu_item::Submenu configureStemExportMenu{STRING_FOR_CONFIGURE_EXPORT_STEMS,
                                                            {
                                                                &configureNormalizationMenu,
@@ -1787,6 +1789,8 @@ PLACE_SDRAM_BSS menu_item::Submenu configureStemExportMenu{STRING_FOR_CONFIGURE_
                                                                &configureSongFXMenu,
                                                                &configureOfflineRenderingMenu,
                                                                &configureMixdownMenu,
+                                                               &configureKitRowsMenu,
+                                                               &configureKitFXMenu,
                                                            }};
 
 PLACE_SDRAM_BSS menu_item::Submenu stemExportMenu{

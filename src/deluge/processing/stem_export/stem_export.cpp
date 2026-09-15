@@ -54,6 +54,7 @@ StemExport stemExport{};
 
 StemExport::StemExport() {
 	currentStemExportType = StemExportType::CLIP;
+	currentStemKind = StemExportType::CLIP;
 	processStarted = false;
 	stopRecording = false;
 
@@ -73,6 +74,7 @@ StemExport::StemExport() {
 	includeKitFX = false;
 	renderOffline = true;
 	exportMixdown = false;
+	includeKitRows = false;
 
 	timePlaybackStopped = 0xFFFFFFFF;
 	timeThereWasLastSomeActivity = 0xFFFFFFFF;
@@ -87,6 +89,7 @@ void StemExport::startStemExportProcess(StemExportType stemExportType) {
 	stopPlayback();
 
 	currentStemExportType = stemExportType;
+	currentStemKind = stemExportType;
 	processStarted = true;
 
 	// exit save UI mode and turn off save button LED
@@ -181,8 +184,7 @@ void StemExport::startOutputRecordingUntilLoopEndAndSilence() {
 				channel = AudioInputChannel::OUTPUT;
 			}
 		}
-		bool normalization =
-		    currentStemExportType == StemExportType::DRUM ? allowNormalizationForDrums : allowNormalization;
+		bool normalization = currentStemKind == StemExportType::DRUM ? allowNormalizationForDrums : allowNormalization;
 		audioRecorder.beginOutputRecording(AudioRecordingFolder::STEMS, channel, writeLoopEndPos(), normalization);
 		if (audioRecorder.recordingSource > AudioInputChannel::NONE) {
 			stopRecording = true;
@@ -449,6 +451,11 @@ int32_t StemExport::disarmAllClipsForStemExport() {
 				if (!clip->isEmpty(false) && outputType != OutputType::MIDI_OUT && outputType != OutputType::CV) {
 					clip->exportStem = true;
 					totalNumStemsToExport++;
+					// a clip run with kit rows on also writes one stem per exportable row of each kit clip
+					if (includeKitRows && currentStemExportType == StemExportType::CLIP
+					    && outputType == OutputType::KIT) {
+						totalNumStemsToExport += countExportableKitRows((InstrumentClip*)clip);
+					}
 				}
 				else {
 					clip->exportStem = false;
@@ -553,6 +560,11 @@ int32_t StemExport::exportClipStems(StemExportType stemExportType) {
 				});
 
 				finishCurrentStemExport(stemExportType, clip->activeIfNoSolo);
+
+				// kit rows on: follow the kit clip's mixed stem with one stem per row, same folder
+				if (includeKitRows && clip->output->type == OutputType::KIT && isUIModeActive(UI_MODE_STEM_EXPORT)) {
+					exportDrumStemsForClip((InstrumentClip*)clip, false);
+				}
 			}
 			// in the event that stem exporting is cancelled while iterating through clips
 			// break out of the loop
@@ -568,16 +580,31 @@ int32_t StemExport::exportClipStems(StemExportType stemExportType) {
 	return totalNumClips;
 }
 
-/// disarms and prepares all the drums so that they can be exported
-int32_t StemExport::disarmAllDrumsForStemExport() {
-	// when we begin stem export, we haven't exported any drums yet, so initialize these variables
-	numStemsExported = 0;
-	totalNumStemsToExport = 0;
-	currentSong->xScroll[NAVIGATION_CLIP] = 0;
+/// a note row is exported as its own drum stem if all these conditions are met:
+///  1) the note row is not muted
+///  2) the note row is not empty (it has notes)
+///  3) it has a drum assigned to it
+///  4) the drum assigned to it is a sound drum
+static bool noteRowIsExportable(NoteRow* noteRow) {
+	return noteRow != nullptr && noteRow->drum != nullptr && noteRow->drum->type == DrumType::SOUND && !noteRow->muted
+	       && !noteRow->hasNoNotes();
+}
 
-	InstrumentClip* clip = getCurrentInstrumentClip();
-	OutputType outputType = clip->output->type;
+/// how many of this kit clip's rows would be exported as drum stems
+int32_t StemExport::countExportableKitRows(InstrumentClip* clip) {
+	int32_t count = 0;
+	int32_t totalNumNoteRows = clip->noteRows.getNumElements();
+	for (int32_t idxNoteRow = 0; idxNoteRow < totalNumNoteRows; ++idxNoteRow) {
+		if (noteRowIsExportable(clip->noteRows.getElement(idxNoteRow))) {
+			count++;
+		}
+	}
+	return count;
+}
 
+/// disarms and prepares all the drums of this kit clip so that they can be exported
+/// addToTotal: count the exportable rows into totalNumStemsToExport (false when the caller already counted them)
+int32_t StemExport::disarmAllDrumsForStemExport(InstrumentClip* clip, bool addToTotal) {
 	// when we trigger stem export, we don't know how many drums there are yet
 	// so get the number and store it so we only need to ping getNumElements once
 	int32_t totalNumNoteRows = clip->noteRows.getNumElements();
@@ -587,16 +614,11 @@ int32_t StemExport::disarmAllDrumsForStemExport() {
 		for (int32_t idxNoteRow = 0; idxNoteRow < totalNumNoteRows; ++idxNoteRow) {
 			NoteRow* thisNoteRow = clip->noteRows.getElement(idxNoteRow);
 			if (thisNoteRow != nullptr) {
-				/* export drum stem if all these conditions are met:
-				    1) the note row is not muted
-				    2) the note row is not empty (it has notes)
-				    3) it has a drum assigned to it
-				    4) the drum assigned to it is a sound drum
-				*/
-				if (thisNoteRow->drum != nullptr && thisNoteRow->drum->type == DrumType::SOUND && !thisNoteRow->muted
-				    && !thisNoteRow->hasNoNotes()) {
+				if (noteRowIsExportable(thisNoteRow)) {
 					thisNoteRow->exportStem = true;
-					totalNumStemsToExport++;
+					if (addToTotal) {
+						totalNumStemsToExport++;
+					}
 				}
 				else {
 					thisNoteRow->exportStem = false;
@@ -611,9 +633,8 @@ int32_t StemExport::disarmAllDrumsForStemExport() {
 }
 
 /// set drum mutes back to their previous state (before exporting stems)
-void StemExport::restoreAllDrumMutes(int32_t totalNumNoteRows) {
+void StemExport::restoreAllDrumMutes(InstrumentClip* clip, int32_t totalNumNoteRows) {
 	// iterate through all the drums to restore previous mute states
-	InstrumentClip* clip = getCurrentInstrumentClip();
 	for (int32_t idxNoteRow = 0; idxNoteRow < totalNumNoteRows; ++idxNoteRow) {
 		NoteRow* thisNoteRow = clip->noteRows.getElement(idxNoteRow);
 		if (thisNoteRow != nullptr) {
@@ -622,20 +643,38 @@ void StemExport::restoreAllDrumMutes(int32_t totalNumNoteRows) {
 	}
 }
 
-/// iterates through all drums, arming one drum at a time for recording
-/// simulates the button combo action of pressing record + play twice to enable resample
-/// and stop recording at the end of the arrangement
+/// standalone drum export: exports the rows of the kit clip currently open in clip view
 int32_t StemExport::exportDrumStems(StemExportType stemExportType) {
 	// need to disarm all the other clips so that we can export just this kit clip
 	int32_t totalNumClips = disarmAllClipsForStemExport();
+	// disarming the clips counted the clips - a drum run counts rows instead
+	numStemsExported = 0;
+	totalNumStemsToExport = 0;
+
+	int32_t totalNumNoteRows = exportDrumStemsForClip(getCurrentInstrumentClip(), true);
+
+	// set clip mutes back to their previous state (before exporting stems)
+	restoreAllClipMutes(totalNumClips);
+
+	return totalNumNoteRows;
+}
+
+/// iterates through this kit clip's drums, arming one drum at a time for recording
+/// simulates the button combo action of pressing record + play twice to enable resample
+/// and stop recording at the end of the row's loop length
+/// used by the standalone drum export (clip view) and by a clip export with kit rows on (song view),
+/// so it must not assume this clip is the one currently open
+int32_t StemExport::exportDrumStemsForClip(InstrumentClip* clip, bool addToTotal) {
 	// prepare all the drums for stem export
-	int32_t totalNumNoteRows = disarmAllDrumsForStemExport();
+	int32_t totalNumNoteRows = disarmAllDrumsForStemExport(clip, addToTotal);
+
+	// the stems written from here on are drum stems, whatever kind of run this is
+	StemExportType kindBefore = currentStemKind;
+	currentStemKind = StemExportType::DRUM;
 
 	if (totalNumNoteRows != 0) {
 		// now we're going to iterate through all drums to find the ones that should be exported
-		InstrumentClip* clip = getCurrentInstrumentClip();
 		Output* output = clip->output;
-		OutputType outputType = output->type;
 		for (int32_t idxNoteRow = totalNumNoteRows - 1; idxNoteRow >= 0; --idxNoteRow) {
 			NoteRow* thisNoteRow = clip->noteRows.getElement(idxNoteRow);
 			if (thisNoteRow != nullptr) {
@@ -650,7 +689,7 @@ int32_t StemExport::exportDrumStems(StemExportType stemExportType) {
 				}
 				getLoopEndPointInSamplesForAudioFile(loopLengthToStopStemExport);
 
-				bool started = startCurrentStemExport(stemExportType, output, thisNoteRow->muted, idxNoteRow,
+				bool started = startCurrentStemExport(StemExportType::DRUM, output, thisNoteRow->muted, idxNoteRow,
 				                                      thisNoteRow->exportStem, (SoundDrum*)thisNoteRow->drum);
 
 				if (!started) {
@@ -674,7 +713,7 @@ int32_t StemExport::exportDrumStems(StemExportType stemExportType) {
 					         || playbackHandler.isEitherClockActive());
 				});
 
-				finishCurrentStemExport(stemExportType, thisNoteRow->muted);
+				finishCurrentStemExport(StemExportType::DRUM, thisNoteRow->muted);
 			}
 			// in the event that stem exporting is cancelled while iterating through drums
 			// break out of the loop
@@ -685,9 +724,11 @@ int32_t StemExport::exportDrumStems(StemExportType stemExportType) {
 	}
 
 	// set drum mutes back to their previous state (before exporting stems)
-	restoreAllDrumMutes(totalNumNoteRows);
-	// set clip mutes back to their previous state (before exporting stems)
-	restoreAllClipMutes(totalNumClips);
+	restoreAllDrumMutes(clip, totalNumNoteRows);
+	// the clip goes back to muted - the caller restores the real mute state at the end of the run
+	clip->activeIfNoSolo = false;
+
+	currentStemKind = kindBefore;
 
 	return totalNumNoteRows;
 }
@@ -724,7 +765,7 @@ bool StemExport::startCurrentStemExport(StemExportType stemExportType, Output* o
 
 	// we haven't exported all the track / clips yet
 	// so display the number of tracks / clips we've exported so far
-	displayStemExportProgress(stemExportType);
+	displayStemExportProgress(currentStemExportType);
 
 	return true;
 }
@@ -793,7 +834,7 @@ void StemExport::updateScrollPosition(StemExportType stemExportType, int32_t ind
 		currentSong->arrangementYScroll = indexNumber - kDisplayHeight;
 		arrangerView.repopulateOutputsOnScreen(false);
 	}
-	else if (stemExportType == StemExportType::DRUM) {
+	else if (stemExportType == StemExportType::DRUM && currentStemExportType == StemExportType::DRUM) {
 		// reset clip view scrolling so we're back at the top left of the kit
 		currentSong->xScroll[NAVIGATION_CLIP] = 0;
 		getCurrentInstrumentClip()->yScroll = indexNumber - kDisplayHeight;
@@ -822,7 +863,7 @@ void StemExport::displayStemExportProgressOLED(StemExportType stemExportType) {
 	exportStatus.append(" of ");
 	exportStatus.appendInt(totalNumStemsToExport);
 	if (stemExportType == StemExportType::CLIP) {
-		exportStatus.append(" clips");
+		exportStatus.append(includeKitRows ? " stems" : " clips");
 	}
 	else if (stemExportType == StemExportType::TRACK) {
 		exportStatus.append(" instruments");
