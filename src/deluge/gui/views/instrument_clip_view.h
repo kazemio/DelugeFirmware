@@ -179,7 +179,6 @@ public:
 	void drawAuditionSquare(uint8_t yDisplay, RGB thisImage[]);
 	void flashDefaultRootNote();
 	void selectEncoderAction(int8_t offset) override;
-	void doubleClipLengthAction();
 	void setSelectedDrum(Drum* drum, bool shouldRedrawStuff = true, Kit* selectedKit = nullptr,
 	                     bool shouldSendMidiFeedback = true);
 	bool isDrumAuditioned(Drum* drum);
@@ -195,6 +194,7 @@ public:
 	void openedInBackground();
 	bool renderMainPads(uint32_t whichRows, RGB image[][kDisplayWidth + kSideBarWidth],
 	                    uint8_t occupancyMask[][kDisplayWidth + kSideBarWidth], bool drawUndefinedArea = true) override;
+
 	void performActualRender(uint32_t whichRows, RGB* image, uint8_t occupancyMask[][kDisplayWidth + kSideBarWidth],
 	                         int32_t xScroll, uint32_t xZoom, int32_t renderWidth, int32_t imageWidth,
 	                         bool drawUndefinedArea = true);

@@ -90,6 +90,13 @@ void GlobalEffectable::initParams(ParamManager* paramManager) {
 
 	unpatchedParams->params[params::UNPATCHED_LPF_MORPH].setCurrentValueBasicForSetup(NEGATIVE_ONE_Q31);
 	unpatchedParams->params[params::UNPATCHED_HPF_MORPH].setCurrentValueBasicForSetup(NEGATIVE_ONE_Q31);
+
+	// GLOBAL-domain macro lanes rest at 0 (source at rest) until the macro system writes them, mirroring
+	// the sound macro lanes (Sound::setupAsDefault). Inert as global params - nothing in render reads them.
+	unpatchedParams->params[params::UNPATCHED_GLOBAL_MACRO_1].setCurrentValueBasicForSetup(-2147483648);
+	unpatchedParams->params[params::UNPATCHED_GLOBAL_MACRO_2].setCurrentValueBasicForSetup(-2147483648);
+	unpatchedParams->params[params::UNPATCHED_GLOBAL_MACRO_3].setCurrentValueBasicForSetup(-2147483648);
+	unpatchedParams->params[params::UNPATCHED_GLOBAL_MACRO_4].setCurrentValueBasicForSetup(-2147483648);
 }
 
 void GlobalEffectable::initParamsForAudioClip(ParamManagerForTimeline* paramManager) {
@@ -749,6 +756,17 @@ ohNo:
 	}
 }
 
+void GlobalEffectable::processSaturation(std::span<StereoSample> buffer, ParamManager* paramManager) {
+	updateSaturationAmountFromParam(paramManager);
+	if (clippingAmount != 0u) {
+		int32_t shiftAmount = getShiftAmountForSaturation();
+		for (StereoSample& sample : buffer) {
+			sample.l = saturate(sample.l, &lastSaturationTanHWorkingValue[0], shiftAmount);
+			sample.r = saturate(sample.r, &lastSaturationTanHWorkingValue[1], shiftAmount);
+		}
+	}
+}
+
 void GlobalEffectable::setupFilterSetConfig(int32_t* postFXVolume, ParamManager* paramManager) {
 
 	UnpatchedParamSet* unpatchedParams = paramManager->getUnpatchedParamSet();
@@ -850,6 +868,18 @@ void GlobalEffectable::writeParamAttributesToFile(Serializer& writer, ParamManag
 
 	unpatchedParams->writeParamAsAttribute(writer, "arpeggiatorRate", params::UNPATCHED_ARP_RATE, writeAutomation,
 	                                       false, valuesForOverride);
+
+	// The GLOBAL-domain macro automation lanes (audio clips / kit-global). Inert as global params, but
+	// their baked automation must persist. Written for every GlobalEffectable for symmetry with the
+	// sound side (Sound::writeParamsToFile); hosts that don't yet drive macros just serialize defaults.
+	unpatchedParams->writeParamAsAttribute(writer, "macro1", params::UNPATCHED_GLOBAL_MACRO_1, writeAutomation, false,
+	                                       valuesForOverride);
+	unpatchedParams->writeParamAsAttribute(writer, "macro2", params::UNPATCHED_GLOBAL_MACRO_2, writeAutomation, false,
+	                                       valuesForOverride);
+	unpatchedParams->writeParamAsAttribute(writer, "macro3", params::UNPATCHED_GLOBAL_MACRO_3, writeAutomation, false,
+	                                       valuesForOverride);
+	unpatchedParams->writeParamAsAttribute(writer, "macro4", params::UNPATCHED_GLOBAL_MACRO_4, writeAutomation, false,
+	                                       valuesForOverride);
 }
 
 void GlobalEffectable::writeParamTagsToFile(Serializer& writer, ParamManager* paramManager, bool writeAutomation,
@@ -982,6 +1012,27 @@ bool GlobalEffectable::readParamTagFromFile(Deserializer& reader, char const* ta
 		reader.exitTag("tempo");
 	}
 
+	else if (!strcmp(tagName, "macro1")) {
+		unpatchedParams->readParam(reader, unpatchedParamsSummary, params::UNPATCHED_GLOBAL_MACRO_1,
+		                           readAutomationUpToPos);
+		reader.exitTag("macro1");
+	}
+	else if (!strcmp(tagName, "macro2")) {
+		unpatchedParams->readParam(reader, unpatchedParamsSummary, params::UNPATCHED_GLOBAL_MACRO_2,
+		                           readAutomationUpToPos);
+		reader.exitTag("macro2");
+	}
+	else if (!strcmp(tagName, "macro3")) {
+		unpatchedParams->readParam(reader, unpatchedParamsSummary, params::UNPATCHED_GLOBAL_MACRO_3,
+		                           readAutomationUpToPos);
+		reader.exitTag("macro3");
+	}
+	else if (!strcmp(tagName, "macro4")) {
+		unpatchedParams->readParam(reader, unpatchedParamsSummary, params::UNPATCHED_GLOBAL_MACRO_4,
+		                           readAutomationUpToPos);
+		reader.exitTag("macro4");
+	}
+
 	else if (!strcmp(tagName, "volume")) {
 		unpatchedParams->readParam(reader, unpatchedParamsSummary, params::UNPATCHED_VOLUME, readAutomationUpToPos);
 		reader.exitTag("volume");
@@ -1060,6 +1111,20 @@ Error GlobalEffectable::readTagFromFile(Deserializer& reader, char const* tagNam
 		reader.exitTag("defaultParams");
 	}
 
+	// Legacy saturation amount, from before it was a param
+	else if (paramManager && !strcmp(tagName, "clippingAmount")) {
+		if (!paramManager->containsAnyMainParamCollections()) {
+			Error error = paramManager->setupUnpatched();
+			if (error != Error::NONE) {
+				return error;
+			}
+			initParams(paramManager);
+		}
+		paramManager->getUnpatchedParamSet()->params[params::UNPATCHED_SATURATION].setCurrentValueBasicForSetup(
+		    saturationParamValueFromLegacyClipping(reader.readTagOrAttributeValueInt()));
+		reader.exitTag("clippingAmount");
+	}
+
 	else if (!strcmp(tagName, "modFXType")) {
 		modFXType_ = stringToFXType(reader.readTagOrAttributeValue());
 		reader.exitTag("modFXType");
@@ -1136,6 +1201,8 @@ Delay::State GlobalEffectable::createDelayWorkingState(ParamManager& paramManage
 	delayWorkingState.userDelayRate =
 	    getFinalParameterValueExp(paramNeutralValues[params::GLOBAL_DELAY_RATE],
 	                              cableToExpParamShortcut(unpatchedParams->getValue(params::UNPATCHED_DELAY_RATE)));
+	delayWorkingState.sendAmount =
+	    (int32_t)(((uint32_t)unpatchedParams->getValue(params::UNPATCHED_DELAY_SEND) + 2147483648u) >> 1);
 	uint32_t timePerTickInverse = playbackHandler.getTimePerInternalTickInverse(true);
 	delay.setupWorkingState(delayWorkingState, timePerTickInverse, soundComingIn);
 
