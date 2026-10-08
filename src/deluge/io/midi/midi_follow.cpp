@@ -36,6 +36,7 @@
 #include "model/instrument/melodic_instrument.h"
 #include "model/note/note_row.h"
 #include "model/song/song.h"
+#include "modulation/macros/macros.h"
 #include "modulation/params/param.h"
 #include "modulation/params/param_set.h"
 #include "playback/mode/session.h"
@@ -264,6 +265,8 @@ void MidiFollow::initDefaultMappings() {
 	soundParamToCC[params::UNPATCHED_START + params::UNPATCHED_BITCRUSHING] = 62;
 	ccToSoundParam[63] = params::UNPATCHED_START + params::UNPATCHED_SAMPLE_RATE_REDUCTION;
 	soundParamToCC[params::UNPATCHED_START + params::UNPATCHED_SAMPLE_RATE_REDUCTION] = 63;
+	ccToSoundParam[69] = params::UNPATCHED_START + params::UNPATCHED_DELAY_SEND;
+	soundParamToCC[params::UNPATCHED_START + params::UNPATCHED_DELAY_SEND] = 69;
 	ccToSoundParam[70] = params::LOCAL_LPF_MORPH;
 	soundParamToCC[params::LOCAL_LPF_MORPH] = 70;
 	ccToSoundParam[71] = params::LOCAL_LPF_RESONANCE;
@@ -300,6 +303,12 @@ void MidiFollow::initDefaultMappings() {
 	soundParamToCC[params::UNPATCHED_START + params::UNPATCHED_BASS] = 86;
 	ccToSoundParam[87] = params::UNPATCHED_START + params::UNPATCHED_TREBLE;
 	soundParamToCC[params::UNPATCHED_START + params::UNPATCHED_TREBLE] = 87;
+	ccToSoundParam[88] = params::UNPATCHED_START + params::UNPATCHED_LFO1_SYNC;
+	soundParamToCC[params::UNPATCHED_START + params::UNPATCHED_LFO1_SYNC] = 88;
+	ccToSoundParam[89] = params::UNPATCHED_START + params::UNPATCHED_LFO2_SYNC;
+	soundParamToCC[params::UNPATCHED_START + params::UNPATCHED_LFO2_SYNC] = 89;
+	ccToSoundParam[90] = params::UNPATCHED_START + params::UNPATCHED_SATURATION;
+	soundParamToCC[params::UNPATCHED_START + params::UNPATCHED_SATURATION] = 90;
 	ccToSoundParam[91] = params::GLOBAL_REVERB_AMOUNT;
 	soundParamToCC[params::GLOBAL_REVERB_AMOUNT] = 91;
 	ccToSoundParam[93] = params::GLOBAL_MOD_FX_DEPTH;
@@ -328,6 +337,41 @@ void MidiFollow::initDefaultMappings() {
 	soundParamToCC[params::UNPATCHED_START + params::UNPATCHED_ARP_SWAP_PROBABILITY] = 112;
 	ccToSoundParam[113] = params::UNPATCHED_START + params::UNPATCHED_ARP_GLIDE_PROBABILITY;
 	soundParamToCC[params::UNPATCHED_START + params::UNPATCHED_ARP_GLIDE_PROBABILITY] = 113;
+	// 114-117 are the macro CCs, mapped further down
+	ccToSoundParam[118] = params::UNPATCHED_START + params::UNPATCHED_LFO3_SYNC;
+	soundParamToCC[params::UNPATCHED_START + params::UNPATCHED_LFO3_SYNC] = 118;
+	ccToSoundParam[119] = params::UNPATCHED_START + params::UNPATCHED_LFO4_SYNC;
+	soundParamToCC[params::UNPATCHED_START + params::UNPATCHED_LFO4_SYNC] = 119;
+
+	// DOTT multiband compressor
+	ccToSoundParam[9] = params::UNPATCHED_START + params::UNPATCHED_MB_COMPRESSOR_CHARACTER;
+	soundParamToCC[params::UNPATCHED_START + params::UNPATCHED_MB_COMPRESSOR_CHARACTER] = 9;
+	ccToSoundParam[11] = params::UNPATCHED_START + params::UNPATCHED_MB_COMPRESSOR_VIBE;
+	soundParamToCC[params::UNPATCHED_START + params::UNPATCHED_MB_COMPRESSOR_VIBE] = 11;
+	ccToSoundParam[22] = params::UNPATCHED_START + params::UNPATCHED_MB_COMPRESSOR_BLEND;
+	soundParamToCC[params::UNPATCHED_START + params::UNPATCHED_MB_COMPRESSOR_BLEND] = 22;
+	ccToSoundParam[31] = params::UNPATCHED_START + params::UNPATCHED_MB_COMPRESSOR_OUTPUT_GAIN;
+	soundParamToCC[params::UNPATCHED_START + params::UNPATCHED_MB_COMPRESSOR_OUTPUT_GAIN] = 31;
+	ccToSoundParam[33] = params::UNPATCHED_START + params::UNPATCHED_MB_COMPRESSOR_THRESHOLD;
+	soundParamToCC[params::UNPATCHED_START + params::UNPATCHED_MB_COMPRESSOR_THRESHOLD] = 33;
+	ccToSoundParam[34] = params::UNPATCHED_START + params::UNPATCHED_MB_COMPRESSOR_RATIO;
+	soundParamToCC[params::UNPATCHED_START + params::UNPATCHED_MB_COMPRESSOR_RATIO] = 34;
+	ccToSoundParam[35] = params::UNPATCHED_START + params::UNPATCHED_MB_COMPRESSOR_ATTACK;
+	soundParamToCC[params::UNPATCHED_START + params::UNPATCHED_MB_COMPRESSOR_ATTACK] = 35;
+	ccToSoundParam[65] = params::UNPATCHED_START + params::UNPATCHED_MB_COMPRESSOR_RELEASE;
+	soundParamToCC[params::UNPATCHED_START + params::UNPATCHED_MB_COMPRESSOR_RELEASE] = 65;
+	ccToSoundParam[94] = params::UNPATCHED_START + params::UNPATCHED_MB_COMPRESSOR_LOW_CROSSOVER;
+	soundParamToCC[params::UNPATCHED_START + params::UNPATCHED_MB_COMPRESSOR_LOW_CROSSOVER] = 94;
+	ccToSoundParam[95] = params::UNPATCHED_START + params::UNPATCHED_MB_COMPRESSOR_HIGH_CROSSOVER;
+	soundParamToCC[params::UNPATCHED_START + params::UNPATCHED_MB_COMPRESSOR_HIGH_CROSSOVER] = 95;
+	ccToSoundParam[92] = params::UNPATCHED_START + params::UNPATCHED_MB_COMPRESSOR_SKEW;
+	soundParamToCC[params::UNPATCHED_START + params::UNPATCHED_MB_COMPRESSOR_SKEW] = 92;
+	ccToSoundParam[2] = params::UNPATCHED_START + params::UNPATCHED_MB_COMPRESSOR_LOW_LEVEL;
+	soundParamToCC[params::UNPATCHED_START + params::UNPATCHED_MB_COMPRESSOR_LOW_LEVEL] = 2;
+	ccToSoundParam[4] = params::UNPATCHED_START + params::UNPATCHED_MB_COMPRESSOR_MID_LEVEL;
+	soundParamToCC[params::UNPATCHED_START + params::UNPATCHED_MB_COMPRESSOR_MID_LEVEL] = 4;
+	ccToSoundParam[8] = params::UNPATCHED_START + params::UNPATCHED_MB_COMPRESSOR_HIGH_LEVEL;
+	soundParamToCC[params::UNPATCHED_START + params::UNPATCHED_MB_COMPRESSOR_HIGH_LEVEL] = 8;
 
 	// GLOBAL PARAMS
 	// NOTE: Here you add the global param, assigning the same CC as its relative sound param
@@ -352,6 +396,8 @@ void MidiFollow::initDefaultMappings() {
 	globalParamToCC[params::UNPATCHED_DELAY_AMOUNT] = 52;
 	ccToGlobalParam[53] = params::UNPATCHED_DELAY_RATE;
 	globalParamToCC[params::UNPATCHED_DELAY_RATE] = 53;
+	ccToGlobalParam[69] = params::UNPATCHED_DELAY_SEND;
+	globalParamToCC[params::UNPATCHED_DELAY_SEND] = 69;
 	ccToGlobalParam[60] = params::UNPATCHED_SIDECHAIN_SHAPE;
 	globalParamToCC[params::UNPATCHED_SIDECHAIN_SHAPE] = 60;
 	ccToGlobalParam[61] = params::UNPATCHED_SIDECHAIN_VOLUME;
@@ -380,10 +426,87 @@ void MidiFollow::initDefaultMappings() {
 	globalParamToCC[params::UNPATCHED_BASS] = 71;
 	ccToGlobalParam[87] = params::UNPATCHED_TREBLE;
 	globalParamToCC[params::UNPATCHED_TREBLE] = 82;
+	ccToGlobalParam[90] = params::UNPATCHED_SATURATION;
+	globalParamToCC[params::UNPATCHED_SATURATION] = 90;
 	ccToGlobalParam[91] = params::UNPATCHED_REVERB_SEND_AMOUNT;
 	globalParamToCC[params::UNPATCHED_REVERB_SEND_AMOUNT] = 91;
 	ccToGlobalParam[93] = params::UNPATCHED_MOD_FX_DEPTH;
 	globalParamToCC[params::UNPATCHED_MOD_FX_DEPTH] = 93;
+
+	// DOTT multiband compressor (same CCs as the sound params)
+	ccToGlobalParam[9] = params::UNPATCHED_MB_COMPRESSOR_CHARACTER;
+	globalParamToCC[params::UNPATCHED_MB_COMPRESSOR_CHARACTER] = 9;
+	ccToGlobalParam[11] = params::UNPATCHED_MB_COMPRESSOR_VIBE;
+	globalParamToCC[params::UNPATCHED_MB_COMPRESSOR_VIBE] = 11;
+	ccToGlobalParam[22] = params::UNPATCHED_MB_COMPRESSOR_BLEND;
+	globalParamToCC[params::UNPATCHED_MB_COMPRESSOR_BLEND] = 22;
+	ccToGlobalParam[31] = params::UNPATCHED_MB_COMPRESSOR_OUTPUT_GAIN;
+	globalParamToCC[params::UNPATCHED_MB_COMPRESSOR_OUTPUT_GAIN] = 31;
+	ccToGlobalParam[33] = params::UNPATCHED_MB_COMPRESSOR_THRESHOLD;
+	globalParamToCC[params::UNPATCHED_MB_COMPRESSOR_THRESHOLD] = 33;
+	ccToGlobalParam[34] = params::UNPATCHED_MB_COMPRESSOR_RATIO;
+	globalParamToCC[params::UNPATCHED_MB_COMPRESSOR_RATIO] = 34;
+	ccToGlobalParam[35] = params::UNPATCHED_MB_COMPRESSOR_ATTACK;
+	globalParamToCC[params::UNPATCHED_MB_COMPRESSOR_ATTACK] = 35;
+	ccToGlobalParam[65] = params::UNPATCHED_MB_COMPRESSOR_RELEASE;
+	globalParamToCC[params::UNPATCHED_MB_COMPRESSOR_RELEASE] = 65;
+	ccToGlobalParam[94] = params::UNPATCHED_MB_COMPRESSOR_LOW_CROSSOVER;
+	globalParamToCC[params::UNPATCHED_MB_COMPRESSOR_LOW_CROSSOVER] = 94;
+	ccToGlobalParam[95] = params::UNPATCHED_MB_COMPRESSOR_HIGH_CROSSOVER;
+	globalParamToCC[params::UNPATCHED_MB_COMPRESSOR_HIGH_CROSSOVER] = 95;
+	ccToGlobalParam[92] = params::UNPATCHED_MB_COMPRESSOR_SKEW;
+	globalParamToCC[params::UNPATCHED_MB_COMPRESSOR_SKEW] = 92;
+	ccToGlobalParam[2] = params::UNPATCHED_MB_COMPRESSOR_LOW_LEVEL;
+	globalParamToCC[params::UNPATCHED_MB_COMPRESSOR_LOW_LEVEL] = 2;
+	ccToGlobalParam[4] = params::UNPATCHED_MB_COMPRESSOR_MID_LEVEL;
+	globalParamToCC[params::UNPATCHED_MB_COMPRESSOR_MID_LEVEL] = 4;
+	ccToGlobalParam[8] = params::UNPATCHED_MB_COMPRESSOR_HIGH_LEVEL;
+	globalParamToCC[params::UNPATCHED_MB_COMPRESSOR_HIGH_LEVEL] = 8;
+
+	// Macros 1-4 on CCs 114-117: the macro lane params stand in for "the macro itself" - a follow
+	// CC landing on one drives the clip's macros (fan-out to their targets, all macro-capable clip
+	// types including MIDI) via Macros::tryFollowMacro(), never a generic param write. The sound
+	// and global ids both map so synth and audio/kit contexts resolve alike; each pair shares one
+	// XML tag ("macro1".."macro4") since both param kinds file under the same name.
+	for (int32_t m = 0; m < Macros::kNumMacros; m++) {
+		ccToSoundParam[114 + m] = params::UNPATCHED_START + params::UNPATCHED_MACRO_1 + m;
+		soundParamToCC[params::UNPATCHED_START + params::UNPATCHED_MACRO_1 + m] = 114 + m;
+		ccToGlobalParam[114 + m] = params::UNPATCHED_GLOBAL_MACRO_1 + m;
+		globalParamToCC[params::UNPATCHED_GLOBAL_MACRO_1 + m] = 114 + m;
+	}
+
+	buildMIDICCShortcutsForAutomation(); // cache the derived grid now the default maps are set
+}
+
+// Recomputes the automation-grid pad -> CC table from the current maps. Reads the const param-shortcut
+// grids (patchedParamShortcuts etc.), which are compile-time-constant .rodata (no static-init hazard).
+void MidiFollow::buildMIDICCShortcutsForAutomation() {
+	for (int32_t x = 0; x < kDisplayWidth; x++) {
+		for (int32_t y = 0; y < kDisplayHeight; y++) {
+			uint8_t ccNumber = MIDI_CC_NONE;
+			uint32_t paramId = params::patchedParamShortcuts[x][y];
+			if (paramId != params::kNoParamID) {
+				ccNumber = soundParamToCC[paramId];
+				if (ccNumber == MIDI_CC_NONE) {
+					ccNumber = globalParamToCC[paramId];
+				}
+			}
+			if (ccNumber == MIDI_CC_NONE) {
+				paramId = params::unpatchedNonGlobalParamShortcuts[x][y];
+				if (paramId != params::kNoParamID) {
+					ccNumber = soundParamToCC[paramId + params::UNPATCHED_START];
+					if (ccNumber == MIDI_CC_NONE) {
+						ccNumber = globalParamToCC[paramId];
+					}
+				}
+			}
+			midiCCShortcutsForAutomation[x][y] = (ccNumber != MIDI_CC_NONE) ? ccNumber : params::kNoParamID;
+		}
+	}
+
+	midiCCShortcutsForAutomation[14][7] = CC_NUMBER_PITCH_BEND;
+	midiCCShortcutsForAutomation[15][0] = CC_NUMBER_AFTERTOUCH;
+	midiCCShortcutsForAutomation[15][7] = CC_NUMBER_Y_AXIS;
 }
 
 /// checks to see if there is an active clip for the current context
@@ -540,6 +663,7 @@ MidiFollow::getModelStackWithParamForClip(ModelStackWithTimelineCounter* modelSt
 		    getModelStackWithParamForKitClip(modelStackWithTimelineCounter, clip, soundParamId, globalParamId);
 		break;
 	case OutputType::AUDIO:
+	case OutputType::AUDIO_FX:
 		modelStackWithParam =
 		    getModelStackWithParamForAudioClip(modelStackWithTimelineCounter, clip, soundParamId, globalParamId);
 		break;
@@ -924,6 +1048,15 @@ Output* MidiFollow::midiCCReceivedForSelectedOrActiveClip(MIDICable& cable, uint
 			selected_track = clip->output;
 		}
 
+		// A follow CC mapped to a macro (CCs 114-117 by default) drives the clip's macros directly
+		// and is consumed, like a learned macro source CC. It must sit above both blocks below:
+		// the internal-params gate excludes MIDI clips, which do host macros, and the
+		// melodic-instrument offer would instead forward the CC out raw.
+		if (clip && (match == MIDIMatchType::MPE_MASTER || match == MIDIMatchType::CHANNEL)
+		    && Macros::tryFollowMacro(clip, ccToSoundParam[ccNumber], ccToGlobalParam[ccNumber], ccValue)) {
+			return selected_track;
+		}
+
 		// don't offer to handleReceivedCC if it's a MIDI or CV Clip
 		// this is because this function is used to control internal deluge parameters only (patched, unpatched)
 		// midi/cv clip cc parameters are handled below in the offerReceivedCCToMelodicInstrument function
@@ -953,6 +1086,28 @@ Output* MidiFollow::midiCCReceivedForSelectedOrActiveClip(MIDICable& cable, uint
 		clip = getActiveClip(modelStack);
 		// these cc's are only relevant for instrument clips
 		if (clip && clip->type == ClipType::INSTRUMENT) {
+			// MIDI/CV arp CC interception: when enabled on this clip, CCs mapped to an arp param control the local
+			// arpeggiator instead of being passed through to the external instrument. The arp is the only internal
+			// param surface a MIDI/CV clip has, so all other CCs still pass through as normal.
+			if ((clip->output->type == OutputType::MIDI_OUT || clip->output->type == OutputType::CV)
+			    && (match == MIDIMatchType::CHANNEL || match == MIDIMatchType::MPE_MASTER)) {
+				ArpeggiatorSettings& arpSettings = ((InstrumentClip*)clip)->arpSettings;
+				if (arpSettings.midiInterceptArp) {
+					// Resolve the CC to an arp param. Most arp params are per-sound and live in ccToSoundParam, but
+					// arp rate is a "global" param: after a MIDIFollow.XML round-trip it is stored in ccToGlobalParam
+					// (as UNPATCHED_ARP_RATE) instead, so normalise it back to GLOBAL_ARP_RATE. Consulting both tables
+					// keeps interception working regardless of which surface the mapping was serialised to, and still
+					// honours any custom CC remaps in the user's MIDIFollow.XML.
+					int32_t arpParamId = ccToSoundParam[ccNumber];
+					if (arpParamId == PARAM_ID_NONE && ccToGlobalParam[ccNumber] == params::UNPATCHED_ARP_RATE) {
+						arpParamId = params::GLOBAL_ARP_RATE;
+					}
+					if (arpParamId != PARAM_ID_NONE && arpSettings.trySetArpParamFromMidiCC(arpParamId, ccValue)) {
+						// Consumed by the local arp - don't pass through to the external instrument.
+						return selected_track;
+					}
+				}
+			}
 			ModelStackWithTimelineCounter* modelStackWithTimelineCounter = modelStack->addTimelineCounter(clip);
 			if (modelStackWithTimelineCounter) {
 				if (clip->output->type == OutputType::KIT) {
@@ -1002,6 +1157,12 @@ void MidiFollow::midiCCReceivedForSpecificTrack(MIDICable& cable, uint8_t channe
 			}
 			else if (specific_track->type == OutputType::CV) {
 				isCVClip = true;
+			}
+
+			// same macro-CC interception as the selected/active-clip path - see there
+			if ((match == MIDIMatchType::MPE_MASTER || match == MIDIMatchType::CHANNEL)
+			    && Macros::tryFollowMacro(clip, ccToSoundParam[ccNumber], ccToGlobalParam[ccNumber], ccValue)) {
+				return;
 			}
 
 			// don't offer to handleReceivedCC if it's a MIDI or CV Clip
@@ -1077,6 +1238,13 @@ void MidiFollow::handleReceivedCC(MIDICable& cable, ModelStackWithTimelineCounte
 	uint8_t globalParamId = ccToGlobalParam[ccNumber];
 	if (soundParamId == PARAM_ID_NONE && globalParamId == PARAM_ID_NONE) {
 		// Abort
+		return;
+	}
+	// A macro lane param is never written via the generic path below: a macro CC that fired was
+	// already consumed in tryFollowMacro() before this. Reaching here means it didn't fire
+	// (inactive/cascade-fed macro, or the feature is off), and writing the inert lane param
+	// directly would move the macro silently without fanning out to its targets.
+	if (Macros::followMacroIndex(soundParamId, globalParamId) >= 0) {
 		return;
 	}
 
@@ -1844,6 +2012,7 @@ void MidiFollow::readDefaultsFromFile() {
 		reader.exitTag();
 	}
 	activeDeserializer->closeWriter();
+	buildMIDICCShortcutsForAutomation(); // XML overrode the maps - refresh the derived grid
 	successfullyReadDefaultsFromFile = true;
 }
 

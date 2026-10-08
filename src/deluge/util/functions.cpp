@@ -630,6 +630,8 @@ char const* getOutputTypeName(OutputType outputType, int32_t channel) {
 		}
 		return "Audio";
 	}
+	case OutputType::AUDIO_FX:
+		return "Master FX";
 	default:
 		return "None";
 	}

@@ -27,6 +27,25 @@ TEST(SyncTests, syncValueToSyncType) {
 	}
 }
 
+TEST(SyncTests, syncTypeAndLevelToSyncValue) {
+	// Every sync value decodes to a (type, level) pair that encodes back to itself
+	for (int32_t i = 0; i < NUM_SYNC_VALUES; i++) {
+		CHECK_EQUAL(i, syncTypeAndLevelToSyncValue(syncValueToSyncType(i), syncValueToSyncLevel(i)));
+	}
+}
+
+TEST(SyncTests, lfoSyncParamValueRoundTrip) {
+	for (int32_t i = 0; i < NUM_SYNC_VALUES; i++) {
+		int32_t paramValue = lfoSyncValueToParamValue(i);
+		// INT32_MIN is the "param never set" sentinel; no encoded value may collide with it
+		CHECK(paramValue != -2147483648);
+		CHECK_EQUAL(i, lfoSyncParamValueToSyncValue(paramValue));
+	}
+	// Full param range maps onto valid sync values at the extremes
+	CHECK_EQUAL(0, lfoSyncParamValueToSyncValue(-2147483648));
+	CHECK_EQUAL(NUM_SYNC_VALUES - 1, lfoSyncParamValueToSyncValue(2147483647));
+}
+
 TEST(SyncTests, syncValueToSyncLevel) {
 	// Zero is off
 	for (int32_t i = 0; i <= MAX_SYNC_LEVEL; i++) {

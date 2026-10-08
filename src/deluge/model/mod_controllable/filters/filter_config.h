@@ -29,7 +29,8 @@ enum class FilterMode {
 	SVF_BAND,              // first HPF mode
 	SVF_NOTCH,             // last LPF mode
 	HPLADDER,
-	OFF, // Keep last as a sentinel. Signifies that the filter is not on, used for filter reset logic
+	SVF_HP24, // two cascaded SVF highpass stages, 24dB/oct; HPF-only, grouped with HPLADDER's family
+	OFF,      // Keep last as a sentinel. Signifies that the filter is not on, used for filter reset logic
 };
 constexpr int32_t kNumFilterModes = util::to_underlying(FilterMode::OFF) + 1;
 constexpr FilterMode kLastLadder = FilterMode::TRANSISTOR_24DB_DRIVE;
@@ -60,8 +61,8 @@ enum LpLadderType { LP12, LP24, DRIVE };
 constexpr uint8_t kNumLadders = 3;
 enum SVFType { BAND, NOTCH };
 constexpr uint8_t kNumSVF = 2;
-enum HPFType { HP12 };
-constexpr uint8_t kNumHPLadders = 1;
+enum HPFType { HP12, HP24 };
+constexpr uint8_t kNumHPLadders = 2;
 
 using specificFilterType = uint8_t;
 // must match order of filter family declaration for indexing to work
@@ -81,6 +82,10 @@ public:
 		case FilterMode::HPLADDER:
 			family = FilterFamily::HP_LADDER;
 			type = HPFType::HP12;
+			break;
+		case FilterMode::SVF_HP24:
+			family = FilterFamily::HP_LADDER;
+			type = HPFType::HP24;
 			break;
 		case FilterMode::SVF_BAND:
 			family = FilterFamily::SVF;

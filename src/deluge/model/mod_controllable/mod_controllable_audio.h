@@ -19,6 +19,7 @@
 
 #include "definitions_cxx.hpp"
 #include "deluge/dsp/granular/GranularProcessor.h"
+#include "dsp/compressor/multiband.h"
 #include "dsp/compressor/rms_feedback.h"
 #include "dsp/delay/delay.h"
 #include "dsp/stereo_sample.h"
@@ -86,6 +87,8 @@ public:
 	virtual void ensureInaccessibleParamPresetValuesWithoutKnobsAreZero(Song* song) {} // Song may be NULL
 	bool isBitcrushingEnabled(ParamManager* paramManager);
 	bool isSRREnabled(ParamManager* paramManager);
+	void updateSaturationAmountFromParam(ParamManager* paramManager);
+	static int32_t saturationParamValueFromLegacyClipping(int32_t legacyClippingAmount);
 	bool hasBassAdjusted(ParamManager* paramManager);
 	bool hasTrebleAdjusted(ParamManager* paramManager);
 	ModelStackWithAutoParam* getParamFromMIDIKnob(MIDIKnob& knob, ModelStackWithThreeMainThings* modelStack) override;
@@ -104,7 +107,7 @@ public:
 	StutterConfig stutterConfig;
 
 	bool sampleRateReductionOnLastTime;
-	uint8_t clippingAmount; // Song probably doesn't currently use this?
+	uint8_t clippingAmount; // Cache of the UNPATCHED_SATURATION param, refreshed each render window
 	FilterMode lpfMode;
 	FilterMode hpfMode;
 	FilterRoute filterRoute;
@@ -113,6 +116,11 @@ public:
 	ModFXType modFXType_;
 	ModFXProcessor modfx{};
 	RMSFeedbackCompressor compressor;
+	deluge::dsp::MultibandCompressor multibandCompressor;
+	CompressorMode compressorMode{CompressorMode::SINGLE};
+
+	/// Apply modulated params from UnpatchedParamSet to multiband compressor before rendering
+	void applyMultibandCompressorParams(ParamManager* paramManager);
 	GranularProcessor* grainFX{nullptr};
 
 	uint32_t lowSampleRatePos{};

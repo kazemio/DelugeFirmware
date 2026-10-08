@@ -53,6 +53,20 @@ enum SyncLevel syncValueToSyncLevel(int32_t option) {
 	}
 }
 
+int32_t syncTypeAndLevelToSyncValue(enum SyncType type, enum SyncLevel level) {
+	return static_cast<int32_t>(type) + static_cast<int32_t>(level) - (type != SYNC_TYPE_EVEN ? 1 : 0);
+}
+
+int32_t lfoSyncParamValueToSyncValue(int32_t paramValue) {
+	return static_cast<int32_t>(
+	    (static_cast<uint64_t>(static_cast<uint32_t>(paramValue) + 2147483648u) * NUM_SYNC_VALUES) >> 32);
+}
+
+int32_t lfoSyncValueToParamValue(int32_t syncValue) {
+	uint32_t biased = static_cast<uint32_t>(((static_cast<uint64_t>(syncValue) * 2u + 1u) << 31) / NUM_SYNC_VALUES);
+	return static_cast<int32_t>(biased - 2147483648u);
+}
+
 void syncValueToString(uint32_t value, StringBuf& buffer, int32_t tickMagnitude) {
 	char const* typeStr = nullptr;
 	enum SyncType type { syncValueToSyncType(value) };
