@@ -156,10 +156,13 @@ Error AudioClip::beginLinearRecording(ModelStackWithTimelineCounter* modelStack,
 
 		inputChannel = ((AudioOutput*)output)->inputChannel;
 		outputRecordingFrom = ((AudioOutput*)output)->getOutputRecordingFrom();
-		numChannels =
-		    (inputChannel >= AUDIO_INPUT_CHANNEL_FIRST_INTERNAL_OPTION || inputChannel == AudioInputChannel::STEREO)
-		        ? 2
-		        : 1;
+		// A single USB channel records as one channel, like a single line input.
+		numChannels = (usbReturnMonoChannelOf(inputChannel) != 0)
+		                  ? 1
+		                  : ((inputChannel >= AUDIO_INPUT_CHANNEL_FIRST_INTERNAL_OPTION
+		                      || inputChannel == AudioInputChannel::STEREO)
+		                         ? 2
+		                         : 1);
 		shouldNormalize =
 		    (inputChannel < AUDIO_INPUT_CHANNEL_FIRST_INTERNAL_OPTION); // if reading from input we need this
 	}

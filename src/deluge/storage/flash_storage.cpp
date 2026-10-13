@@ -29,6 +29,7 @@
 #include "model/scale/preset_scales.h"
 #include "processing/engines/audio_engine.h"
 #include "processing/engines/cv_engine.h"
+#include "processing/engines/usb_audio_stream.h"
 #include "processing/metronome/metronome.h"
 #include "util/firmware_version.h"
 #include "util/functions.h"
@@ -216,6 +217,9 @@ enum Entries {
 190: GlobalMIDICommand::SHIFT channel + 1
 191: GlobalMIDICommand::SHIFT noteCode + 1
 192-195: GlobalMIDICommand::SHIFT product / vendor ids
+199: usbAudioReturnPair + 1 (0 = never written)
+200: usbAudioReturnLevel + 1 (0 = never written)
+201: usbAudioCompensationMs
 */
 
 uint8_t defaultScale;
@@ -262,6 +266,9 @@ bool highCPUUsageIndicator;
 uint8_t defaultHoldTime;
 ScreensaverMode screensaverMode;
 uint8_t screensaverTimeoutMinutes;
+uint8_t usbAudioReturnPair;
+uint8_t usbAudioReturnLevel;
+uint8_t usbAudioCompensationMs;
 int32_t holdTime;
 
 uint8_t defaultSwingInterval;
@@ -380,6 +387,9 @@ void resetSettings() {
 
 	screensaverMode = kDefaultScreensaverMode;
 	screensaverTimeoutMinutes = kDefaultScreensaverTimeoutMinutes;
+	usbAudioReturnPair = 1;
+	usbAudioReturnLevel = deluge::processing::engines::USBAudioStream::kReturnLevelDefault;
+	usbAudioCompensationMs = 0;
 
 	defaultSwingInterval = 8 - defaultMagnitude; // 16th notes
 
@@ -881,6 +891,19 @@ void readSettings() {
 		screensaverMode =
 		    (buffer[196] < kNumScreensaverModes) ? static_cast<ScreensaverMode>(buffer[196]) : kDefaultScreensaverMode;
 	}
+
+	{
+		using deluge::processing::engines::USBAudioStream;
+		usbAudioReturnPair =
+		    (buffer[199] == 0 || buffer[199] > USBAudioStream::numReturnPairs() + 1) ? 1 : (uint8_t)(buffer[199] - 1);
+		usbAudioReturnLevel = (buffer[200] == 0 || buffer[200] > USBAudioStream::kReturnLevelMax + 1)
+		                          ? (uint8_t)USBAudioStream::kReturnLevelDefault
+		                          : (uint8_t)(buffer[200] - 1);
+		usbAudioCompensationMs = (buffer[201] > USBAudioStream::kCompensationMaxMs) ? 0 : buffer[201];
+		USBAudioStream::setMasterReturnPair(usbAudioReturnPair);
+		USBAudioStream::setReturnLevel(usbAudioReturnLevel);
+		USBAudioStream::setCompensationMs(usbAudioCompensationMs);
+	}
 }
 
 /// Sanity-check the pre-c1.3 MIDI-follow block (bytes 126-145) before migrating it. Same checks the deleted
@@ -1150,6 +1173,9 @@ void writeSettings() {
 
 	buffer[196] = util::to_underlying(screensaverMode);
 	buffer[197] = screensaverTimeoutMinutes;
+	buffer[199] = (uint8_t)(usbAudioReturnPair + 1);
+	buffer[200] = (uint8_t)(usbAudioReturnLevel + 1);
+	buffer[201] = usbAudioCompensationMs;
 
 	R_SFLASH_EraseSector(0x80000 - 0x1000, SPIBSC_CH, SPIBSC_CMNCR_BSZ_SINGLE, 1, SPIBSC_OUTPUT_ADDR_24);
 	R_SFLASH_ByteProgram(0x80000 - 0x1000, buffer.data(), 256, SPIBSC_CH, SPIBSC_CMNCR_BSZ_SINGLE, SPIBSC_1BIT,

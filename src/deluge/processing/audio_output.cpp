@@ -29,6 +29,7 @@
 #include "playback/mode/playback_mode.h"
 #include "playback/playback_handler.h"
 #include "processing/engines/audio_engine.h"
+#include "processing/engines/usb_audio_stream.h"
 #include "storage/audio/audio_file.h"
 #include "storage/storage_manager.h"
 #include "util/lookuptables/lookuptables.h"
@@ -208,9 +209,26 @@ renderEnvelope:
 	                                     ? std::span{reinterpret_cast<StereoSample*>(bufferToTransferTo), render.size()}
 	                                     : render;
 
-	// add in the monitored audio if in sampler or looper mode
+	// Audio arriving over USB as this track's input, rendered through the track like a line input. Reading it here
+	// also takes that pair off the song's own mix, which is summed later.
 	if (modeAllowsMonitoring() && modelStack->song->isOutputActiveInArrangement(this)
-	    && inputChannel != AudioInputChannel::SPECIFIC_OUTPUT) {
+	    && isUsbReturnInput(inputChannel)) {
+		rendered = true;
+		const uint32_t monoChannel = usbReturnMonoChannelOf(inputChannel);
+		if (monoChannel != 0) {
+			deluge::processing::engines::USBAudioStream::readReturnChannel(
+			    monoChannel, output.data(), (uint32_t)output.size(), amplitudeAtStart, amplitudeAtEnd);
+		}
+		else {
+			deluge::processing::engines::USBAudioStream::readReturnPair(usbReturnPairOf(inputChannel), output.data(),
+			                                                            (uint32_t)output.size(), amplitudeAtStart,
+			                                                            amplitudeAtEnd);
+		}
+	}
+
+	// add in the monitored audio if in sampler or looper mode
+	else if (modeAllowsMonitoring() && modelStack->song->isOutputActiveInArrangement(this)
+	         && inputChannel != AudioInputChannel::SPECIFIC_OUTPUT) {
 		rendered = true;
 		int32_t const* __restrict__ input_ptr = (int32_t const*)AudioEngine::i2sRXBufferPos;
 

@@ -224,6 +224,7 @@
 #include "gui/menu_item/unison/stereoSpread.h"
 #include "gui/menu_item/unpatched_param.h"
 #include "gui/menu_item/unpatched_param/pan.h"
+#include "gui/menu_item/usb_audio/routing.h"
 #include "gui/menu_item/voice/polyphony.h"
 #include "gui/menu_item/voice/portamento.h"
 #include "gui/menu_item/voice/priority.h"
@@ -1517,6 +1518,53 @@ PLACE_SDRAM_BSS Submenu soundEditorRootDrumActionsMenu{
     {&drumNameEditMenu, &sample0RecorderMenu, &sample1RecorderMenu},
 };
 
+// USB audio routing, per track: eight mono channels, four stereo pairs, and whether the track stays in the main mix.
+PLACE_SDRAM_BSS usb_audio::ChannelToggle usbChannel1Menu{STRING_FOR_USB_CHANNEL_1, STRING_FOR_USB_CHANNEL_1,
+                                                         UsbRoute::CH1};
+PLACE_SDRAM_BSS usb_audio::ChannelToggle usbChannel2Menu{STRING_FOR_USB_CHANNEL_2, STRING_FOR_USB_CHANNEL_2,
+                                                         UsbRoute::CH2};
+PLACE_SDRAM_BSS usb_audio::ChannelToggle usbChannel3Menu{STRING_FOR_USB_CHANNEL_3, STRING_FOR_USB_CHANNEL_3,
+                                                         UsbRoute::CH3};
+PLACE_SDRAM_BSS usb_audio::ChannelToggle usbChannel4Menu{STRING_FOR_USB_CHANNEL_4, STRING_FOR_USB_CHANNEL_4,
+                                                         UsbRoute::CH4};
+PLACE_SDRAM_BSS usb_audio::ChannelToggle usbChannel5Menu{STRING_FOR_USB_CHANNEL_5, STRING_FOR_USB_CHANNEL_5,
+                                                         UsbRoute::CH5};
+PLACE_SDRAM_BSS usb_audio::ChannelToggle usbChannel6Menu{STRING_FOR_USB_CHANNEL_6, STRING_FOR_USB_CHANNEL_6,
+                                                         UsbRoute::CH6};
+PLACE_SDRAM_BSS usb_audio::ChannelToggle usbChannel7Menu{STRING_FOR_USB_CHANNEL_7, STRING_FOR_USB_CHANNEL_7,
+                                                         UsbRoute::CH7};
+PLACE_SDRAM_BSS usb_audio::ChannelToggle usbChannel8Menu{STRING_FOR_USB_CHANNEL_8, STRING_FOR_USB_CHANNEL_8,
+                                                         UsbRoute::CH8};
+PLACE_SDRAM_BSS usb_audio::ChannelToggle usbPair12Menu{STRING_FOR_USB_PAIR_12, STRING_FOR_USB_PAIR_12,
+                                                       UsbRoute::PAIR12};
+PLACE_SDRAM_BSS usb_audio::ChannelToggle usbPair34Menu{STRING_FOR_USB_PAIR_34, STRING_FOR_USB_PAIR_34,
+                                                       UsbRoute::PAIR34};
+PLACE_SDRAM_BSS usb_audio::ChannelToggle usbPair56Menu{STRING_FOR_USB_PAIR_56, STRING_FOR_USB_PAIR_56,
+                                                       UsbRoute::PAIR56};
+PLACE_SDRAM_BSS usb_audio::ChannelToggle usbPair78Menu{STRING_FOR_USB_PAIR_78, STRING_FOR_USB_PAIR_78,
+                                                       UsbRoute::PAIR78};
+PLACE_SDRAM_BSS usb_audio::MainToggle usbMainMenu{STRING_FOR_USB_MAIN, STRING_FOR_USB_MAIN};
+
+PLACE_SDRAM_BSS usb_audio::RoutingSubmenu usbRoutingMenu{
+    STRING_FOR_USB_ROUTING,
+    STRING_FOR_USB_ROUTING,
+    {
+        &usbChannel1Menu,
+        &usbChannel2Menu,
+        &usbChannel3Menu,
+        &usbChannel4Menu,
+        &usbChannel5Menu,
+        &usbChannel6Menu,
+        &usbChannel7Menu,
+        &usbChannel8Menu,
+        &usbPair12Menu,
+        &usbPair34Menu,
+        &usbPair56Menu,
+        &usbPair78Menu,
+        &usbMainMenu,
+    },
+};
+
 PLACE_SDRAM_BSS Submenu soundEditorRootMenu{
     STRING_FOR_SOUND,
     {
@@ -1547,6 +1595,7 @@ PLACE_SDRAM_BSS Submenu soundEditorRootMenu{
         &patchCablesMenu,
         &sequenceDirectionMenu,
         &outputMidiSubmenu,
+        &usbRoutingMenu,
     },
 };
 
@@ -1744,6 +1793,7 @@ PLACE_SDRAM_BSS menu_item::Submenu soundEditorRootMenuAudioClip{
         &audioClipSampleMenu,
         &audioClipAttackMenu,
         &priorityMenu,
+        &usbRoutingMenu,
     },
 };
 
@@ -1891,6 +1941,24 @@ PLACE_SDRAM_BSS menu_item::Submenu soundEditorRootMenuKitGlobalFX{
         &globalFiltersMenu,
         &globalFXMenu,
         &globalSidechainMenu,
+        &usbRoutingMenu,
+    },
+};
+
+// USB audio, per machine: which returning pair joins the song, its level, and the delay compensation.
+PLACE_SDRAM_BSS usb_audio::ReturnPair usbAudioReturnMenu{STRING_FOR_USB_RETURN, STRING_FOR_USB_RETURN};
+PLACE_SDRAM_BSS usb_audio::ReturnLevel usbAudioReturnLevelMenu{STRING_FOR_USB_RETURN_LEVEL,
+                                                               STRING_FOR_USB_RETURN_LEVEL};
+PLACE_SDRAM_BSS usb_audio::Compensation usbAudioCompensationMenu{STRING_FOR_USB_COMPENSATION,
+                                                                 STRING_FOR_USB_COMPENSATION};
+
+PLACE_SDRAM_BSS Submenu usbAudioSettingsMenu{
+    STRING_FOR_USB_AUDIO,
+    STRING_FOR_USB_AUDIO,
+    {
+        &usbAudioReturnMenu,
+        &usbAudioReturnLevelMenu,
+        &usbAudioCompensationMenu,
     },
 };
 
@@ -1901,6 +1969,7 @@ PLACE_SDRAM_BSS Submenu settingsRootMenu{
         &settingsActionsSubmenu,
         &cvSelectionMenu,
         &gateSelectionMenu,
+        &usbAudioSettingsMenu,
         &triggerClockMenu,
         &midiMenu,
         &defaultsSubmenu,

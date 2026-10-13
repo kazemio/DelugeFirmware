@@ -57,6 +57,7 @@
 #include "processing/audio_output.h"
 #include "processing/engines/audio_engine.h"
 #include "processing/engines/cv_engine.h"
+#include "processing/engines/usb_audio_stream.h"
 #include "processing/sound/sound_instrument.h"
 #include "processing/stem_export/stem_export.h"
 #include "storage/flash_storage.h"
@@ -2501,6 +2502,8 @@ void Song::renderAudio(std::span<StereoSample> outputBuffer, int32_t* reverbBuff
 	ModelStack* modelStack = setupModelStackWithSong(modelStackMemory, this);
 
 	AudioEngine::logAction("Start output render");
+	using deluge::processing::engines::USBAudioStream;
+	const bool captureStems = USBAudioStream::stemsWanted();
 	for (Output* output = firstOutput; output; output = output->next) {
 		if (!output->inValidState) {
 			continue;
@@ -2510,8 +2513,27 @@ void Song::renderAudio(std::span<StereoSample> outputBuffer, int32_t* reverbBuff
 		    (output->getActiveClip() && isClipActive(output->getActiveClip()->getClipBeingRecordedFrom()));
 		ENTER_CRITICAL_SECTION();
 		if (output->shouldRenderInSong()) {
+			// A track's USB copy is the difference its render makes to the mix, so nothing renders twice. Its
+			// reverb send goes to a shared buffer mixed in later, so the copy is dry and a track taken out of the
+			// main mix still leaves its reverb tail there.
+			const uint16_t route = output->usbRouting;
+			const bool wantsCopy = captureStems && (route & UsbRoute::ANY_USB) != 0;
+			const bool wantsOut = !output->isInMainMix();
+			const uint32_t numSamples = (uint32_t)outputBuffer.size();
+			int32_t* const mixRaw = (int32_t*)outputBuffer.data();
+			if (wantsCopy || wantsOut) {
+				USBAudioStream::snapshotBeforeTrack(mixRaw, numSamples);
+			}
+
 			output->renderOutput(modelStack, outputBuffer, reverbBuffer, volumePostFX >> 1, sideChainHitPending,
 			                     !isClipActiveNow, isClipActiveNow);
+
+			if (wantsCopy) {
+				USBAudioStream::captureStem(route, mixRaw, numSamples);
+			}
+			if (wantsOut) {
+				USBAudioStream::removeTrackFromMix(mixRaw, numSamples);
+			}
 		}
 		EXIT_CRITICAL_SECTION();
 #if DO_AUDIO_LOG
@@ -2520,6 +2542,14 @@ void Song::renderAudio(std::span<StereoSample> outputBuffer, int32_t* reverbBuff
 		AudioEngine::logAction(buf);
 #endif
 	}
+
+	// The Deluge's own tracks are held back by the compensation delay, then audio returning over USB joins the song
+	// here, before every song-level effect, so a track sent out and returned lands where it left.
+	if (!stemExport.renderingOffline()) {
+		USBAudioStream::compensate(outputBuffer.data(), reverbBuffer, (uint32_t)outputBuffer.size());
+	}
+	USBAudioStream::mixReturn(outputBuffer.data(), (uint32_t)outputBuffer.size());
+
 	AudioEngine::logAction("done rendering outputs");
 	// If recording the "MIX", this is the place where we want to grab it - before any master FX or volume applied
 	// Go through each SampleRecorder, feeding them audio

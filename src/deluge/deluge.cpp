@@ -62,6 +62,7 @@
 #include "playback/mode/session.h"
 #include "processing/engines/audio_engine.h"
 #include "processing/engines/cv_engine.h"
+#include "processing/engines/usb_audio_stream.h"
 #include "scheduler_api.h"
 #include "storage/audio/audio_file_manager.h"
 #include "storage/flash_storage.h"
@@ -142,8 +143,10 @@ void inputRoutine() {
 	bool speakerOn = (!AudioEngine::headphonesPluggedIn && !outputPluggedInR && !outputPluggedInL);
 	setOutputState(SPEAKER_ENABLE.port, SPEAKER_ENABLE.pin, speakerOn);
 
+	// A host streaming USB audio is a listener too; without it a stereo pair carries a mono render.
 	AudioEngine::renderInStereo =
-	    (AudioEngine::headphonesPluggedIn || outputPluggedInR || AudioEngine::isAnyInternalRecordingHappening());
+	    (AudioEngine::headphonesPluggedIn || outputPluggedInR || AudioEngine::isAnyInternalRecordingHappening()
+	     || deluge::processing::engines::USBAudioStream::stemsWanted());
 
 	bool lineInNow = readInput(LINE_IN_DETECT.port, LINE_IN_DETECT.pin) != 0u;
 	if (lineInNow != AudioEngine::lineInPluggedIn) {
@@ -551,6 +554,7 @@ void registerTasks() {
 	AudioEngine::routine_task_id = addRepeatingTask(&(AudioEngine::routine_task), p++, 8 / 44100., 64 / 44100.,
 	                                                128 / 44100., "audio  routine", RESOURCE_NONE);
 	addRepeatingTask(MidiEngine::check_incoming_usb, p++, 0.0005, 0.0005, 0.001, "check usb midi", RESOURCE_USB);
+	addRepeatingTask(usbAudioStreamRoutine, p++, 0.0005, 0.0005, 0.001, "usb audio stream", RESOURCE_USB);
 
 	// Polling both phases catches slow B-only transitions; A-edge IRQs still capture fast movement promptly.
 	encoders::EncoderTaskID = addRepeatingTask(&(encoders::interpretEncodersTask), p++, 0.001, 0.001, 0.002,
