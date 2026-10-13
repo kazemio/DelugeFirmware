@@ -52,6 +52,8 @@ public:
 
 	inline bool containsAnyParamCollectionsIncludingExpression() { return summaries[0].paramCollection; }
 
+	inline bool hasPatchedParamSet() const { return summaries[1].paramCollection != nullptr; }
+
 	Error setupWithPatching();
 	Error setupUnpatched();
 	Error setupMIDI();

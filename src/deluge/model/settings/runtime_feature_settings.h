@@ -68,6 +68,10 @@ enum RuntimeFeatureSettingType : uint32_t {
 	ShowBatteryLevel,
 	RoundedCorners,
 	ShortcutOverlay,
+	MacroSystem,
+	ShowRealUnits,
+	ModFXPostDOTT,
+	EnableSpectrumAnalyzer,
 	MaxElement // Keep as boundary
 };
 

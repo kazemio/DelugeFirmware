@@ -129,6 +129,12 @@ bool Kit::writeDataToFile(Serializer& writer, Clip* clipForSavingOutputOnly, Son
 	}
 	GlobalEffectableForClip::writeTagsToFile(writer, paramManager, clipForSavingOutputOnly == nullptr);
 
+	// The GLOBAL-domain macros block (kit-global macros live on this Output, like synth/MIDI macros live
+	// on the instrument). Only written when a macro deviates from its defaults.
+	if (Macros::anyMacroConfigured(macros)) {
+		Macros::writeMacrosToFile(writer, macros, Macros::domainForOutput(this));
+	}
+
 	writer.writeArrayStart("soundSources"); // TODO: change this?
 	int32_t selectedDrumIndex = -1;
 	int32_t drumIndex = 0;
@@ -306,6 +312,11 @@ doReadDrum:
 		}
 		else if (!strcmp(tagName, "MIDIInput")) {
 			midiInput.readNoteFromFile(reader);
+			reader.exitTag();
+		}
+		else if (!strcmp(tagName, "macros")) {
+			Macros::readMacrosFromFile(reader, macros, Macros::domainForOutput(this));
+			editedByUser = true;
 			reader.exitTag();
 		}
 		else {
@@ -676,8 +687,8 @@ void Kit::renderOutput(ModelStack* modelStack, std::span<StereoSample> output, i
 
 	// if you're exporting drum stems and includeKitFX configuration setting is disabled
 	// render kit row without kit affect entire FX (but leave in kit affect entire pitch adjustment)
-	if (stemExport.processStarted && (stemExport.currentStemExportType == StemExportType::DRUM)
-	    && !stemExport.includeKitFX) [[unlikely]] {
+	if (stemExport.processStarted && (stemExport.currentStemKind == StemExportType::DRUM) && !stemExport.includeKitFX)
+	    [[unlikely]] {
 		UnpatchedParamSet* unpatchedParams = paramManager->getUnpatchedParamSet();
 
 		int32_t pitchAdjust =
