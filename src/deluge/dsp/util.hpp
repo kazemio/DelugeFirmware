@@ -19,8 +19,10 @@
 #include "deluge/util/fixedpoint.h"
 #include "deluge/util/functions.h"
 #include <algorithm>
-#include <arm_neon.h>
 #include <cmath>
+#if defined(__ARM_NEON) || defined(__ARM_NEON__)
+#include <arm_neon.h>
+#endif
 
 namespace deluge::dsp {
 /**
@@ -168,6 +170,7 @@ inline float triangleFloat(float phase, float duty = 1.0f) {
 	return x;
 }
 
+#if defined(__ARM_NEON) || defined(__ARM_NEON__)
 /// Soft clip 4 q31 samples using NEON SIMD
 /// @param x 4 input samples as NEON vector
 /// @param knee Clipping knee point
@@ -194,5 +197,6 @@ inline float triangleFloat(float phase, float duty = 1.0f) {
 	result = vmaxq_s32(result, negClipped);
 	return result;
 }
+#endif
 
 } // namespace deluge::dsp
