@@ -21,6 +21,7 @@
 #include "gui/menu_item/patched_param/integer_non_fm.h"
 #include "gui/menu_item/unpatched_param.h"
 #include "gui/menu_item/value_scaling.h"
+#include "gui/ui/param_freq_display.h"
 #include "modulation/params/param.h"
 
 #include <util/comparison.h>
@@ -54,6 +55,11 @@ public:
 				value = 50 - value;
 			}
 			drawSlider(slot, value);
+		}
+		else if (info.getFilterParamType() == FilterParamType::FREQUENCY
+		         && param_freq_display::drawCompactHz(getParamKind(), getP(), getValue(), slot.start_x,
+		                                              slot.start_y + kHorizontalMenuSlotYOffset, slot.width)) {
+			// Hz text drawn in place of the bar (community feature)
 		}
 		else {
 			drawBar(slot);
@@ -96,6 +102,11 @@ public:
 				value = 50 - value;
 			}
 			drawSlider(slot, value);
+		}
+		else if (info.getFilterParamType() == FilterParamType::FREQUENCY
+		         && param_freq_display::drawCompactHz(getParamKind(), getP(), getValue(), slot.start_x,
+		                                              slot.start_y + kHorizontalMenuSlotYOffset, slot.width)) {
+			// Hz text drawn in place of the bar (community feature)
 		}
 		else {
 			drawBar(slot);

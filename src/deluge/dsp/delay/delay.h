@@ -31,6 +31,10 @@ public:
 		bool doDelay;
 		int32_t userDelayRate;
 		int32_t delayFeedbackAmount;
+		// Gain on new audio entering the delay. At ONE_Q31 (the default) the legacy unity path is
+		// taken, so existing songs are bit-identical. At 0, no new audio enters, but existing
+		// buffer contents keep circulating and remain audible ("delay throw").
+		int32_t sendAmount = 2147483647;
 		int32_t analog_saturation = 8;
 	};
 

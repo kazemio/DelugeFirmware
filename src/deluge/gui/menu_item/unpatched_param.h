@@ -18,6 +18,7 @@
 #pragma once
 
 #include "gui/menu_item/integer.h"
+#include "gui/ui/param_freq_display.h"
 #include "menu_item_with_cc_learning.h"
 #include "param.h"
 
@@ -38,6 +39,19 @@ public:
 	bool usesAffectEntire() override { return true; }
 	void readCurrentValue() override;
 	void writeCurrentValue() override;
+
+	// Adds the real-world unit reading (Hz / ms) under the value for convertible params, when the
+	// ShowRealUnits community feature is on. No-op for everything else.
+	void drawPixelsForOled() override {
+		IntegerContinuous::drawPixelsForOled();
+		param_freq_display::drawMenuHzLine(getParamKind(), getP(), this->getValue());
+	}
+
+	// Same reading appended to the horizontal-menu value banner, e.g. "35 (2.7k)"
+	void getNotificationValue(StringBuf& value) override {
+		IntegerContinuous::getNotificationValue(value);
+		param_freq_display::appendShortSuffixForMenuValue(getParamKind(), getP(), this->getValue(), value);
+	}
 	ParamDescriptor getLearningThing() final;
 	[[nodiscard]] int32_t getMaxValue() const override { return Param::getMaxValue(); }
 	[[nodiscard]] int32_t getMinValue() const override { return Param::getMinValue(); }

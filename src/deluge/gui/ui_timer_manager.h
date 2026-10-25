@@ -45,6 +45,7 @@ enum class TimerName {
 	SEND_MIDI_FEEDBACK_FOR_AUTOMATION,
 	INTERPOLATION_SHORTCUT_BLINK,
 	PAD_SELECTION_SHORTCUT_BLINK,
+	MACRO_TARGET_ASSIGN_PULSE, // slow white/yellow alternation of both-layers-assigned pads in the picker
 	NOTE_ROW_BLINK,
 	LOADING_ANIMATION,
 	MOD_ENCODER_POPUP_FLUSH,
@@ -52,6 +53,7 @@ enum class TimerName {
 	SELECTED_NOTE_PULSE,
 	/// Idle countdown before the screensaver appears, then its frame clock while it shows
 	SCREENSAVER,
+	SPECTRUM_OVERLAY,
 	/// Total number of timers
 	NUM_TIMERS
 };
