@@ -88,7 +88,7 @@ void SyncLevel::renderInHorizontalMenu(const SlotPosition& slot) {
 }
 
 int32_t SyncLevel::syncTypeAndLevelToMenuOption(::SyncType type, ::SyncLevel level) {
-	return static_cast<int32_t>(type) + (static_cast<int32_t>(level) - (type != SYNC_TYPE_EVEN ? 1 : 0));
+	return syncTypeAndLevelToSyncValue(type, level);
 }
 
 void SyncLevel::getShortOption(StringBuf& opt) {

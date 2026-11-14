@@ -51,6 +51,11 @@ public:
 
 	void updateParamsFromUnpatchedParamSet(UnpatchedParamSet* unpatchedParams);
 
+	/// For MIDI/CV clips: apply a MIDI-follow CC (0-127) that is mapped to an arp param directly to the matching
+	/// setting, mirroring how the menus store these values. Returns true if soundParamId was an arp param we handle
+	/// (and was therefore consumed), false otherwise.
+	bool trySetArpParamFromMidiCC(int32_t soundParamId, int32_t ccValue);
+
 	void cloneFrom(ArpeggiatorSettings const* other);
 
 	bool readCommonTagsFromFile(Deserializer& reader, char const* tagName, Song* songToConvertSyncLevel);
@@ -94,6 +99,10 @@ public:
 
 	// Arp randomizer lock
 	bool randomizerLock{false};
+
+	// When true, MIDI-follow CCs mapped to arp params control this clip's arpeggiator instead of being passed through
+	// to the external instrument. MIDI/CV clips only; defaults off to preserve pass-through behaviour.
+	bool midiInterceptArp{false};
 
 	// MPE settings
 	ArpMpeModSource mpeVelocity{ArpMpeModSource::OFF};

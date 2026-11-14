@@ -341,6 +341,8 @@ void Delay::process(std::span<StereoSample> buffer, const State& delayWorkingSta
 
 	// Go through what we grabbed, saturating and filtering it, sending it to the audio output buffer, and also
 	// preparing it to be fed back into the delay. All in one pass, with the filter state kept in registers
+	const int32_t sendAmount = delayWorkingState.sendAmount;
+	const bool unitySend = (sendAmount == ONE_Q31);
 	auto feedBack = [&](auto saturate, auto pingPongStereo) {
 		int32_t lpfL = postLPFL;
 		int32_t lpfR = postLPFR;
@@ -365,13 +367,22 @@ void Delay::process(std::span<StereoSample> buffer, const State& delayWorkingSta
 
 				// Feedback calculation, and combination with input
 				StereoSample in = *output;
+
+				// New audio entering the delay, scaled by the send amount. Full send takes the exact legacy
+				// path so existing songs are unaffected.
+				StereoSample dry = in;
+				if (!unitySend) {
+					dry.l = multiply_32x32_rshift32(dry.l, sendAmount) << 1;
+					dry.r = multiply_32x32_rshift32(dry.r, sendAmount) << 1;
+				}
+
 				StereoSample feedback;
 				if constexpr (pingPongStereo) {
 					feedback.l = current.r;
-					feedback.r = ((in.l + in.r) >> 1) + current.l;
+					feedback.r = ((dry.l + dry.r) >> 1) + current.l;
 				}
 				else {
-					feedback = current + in;
+					feedback = current + dry;
 				}
 
 				// Output

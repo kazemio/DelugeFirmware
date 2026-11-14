@@ -25,6 +25,7 @@
 
 class Output;
 class Clip;
+class InstrumentClip;
 class SoundDrum;
 
 class StemExport {
@@ -43,6 +44,10 @@ public:
 	bool processStarted;
 	bool stopRecording;
 	StemExportType currentStemExportType;
+	/// the kind of stem currently being written. Normally equals currentStemExportType, but a CLIP run with
+	/// includeKitRows on flips this to DRUM while it writes a kit clip's individual rows (drum naming, loop-end
+	/// marker, kit-FX bypass and drum normalization all key off this, folder choice keys off the run type)
+	StemExportType currentStemKind;
 	uint32_t timePlaybackStopped;
 	uint32_t timeThereWasLastSomeActivity;
 
@@ -54,6 +59,8 @@ public:
 	bool includeKitFX;
 	bool renderOffline;
 	bool exportMixdown;
+	/// clip export also writes each kit clip's rows as separate drum stems into the same CLIPS folder
+	bool includeKitRows;
 
 	// export instruments
 	int32_t disarmAllInstrumentsForStemExport(StemExportType stemExportType);
@@ -72,9 +79,11 @@ public:
 	int32_t loopEndPointInSamplesForAudioFile;
 
 	// export drums
-	int32_t disarmAllDrumsForStemExport();
+	int32_t disarmAllDrumsForStemExport(InstrumentClip* clip, bool addToTotal);
 	int32_t exportDrumStems(StemExportType stemExportType);
-	void restoreAllDrumMutes(int32_t totalNumNoteRows);
+	int32_t exportDrumStemsForClip(InstrumentClip* clip, bool addToTotal);
+	int32_t countExportableKitRows(InstrumentClip* clip);
+	void restoreAllDrumMutes(InstrumentClip* clip, int32_t totalNumNoteRows);
 
 	// start exporting
 	bool startCurrentStemExport(StemExportType stemExportType, Output* output, bool& muteState, int32_t fileNumber,

@@ -29,7 +29,8 @@ q31_t tempRenderBuffer[SSI_TX_BUFFER_NUM_SAMPLES * 2]; // * 2 to accomodate ster
 		if (hpfMode_ == FilterMode::HPLADDER) {
 			hpfilter.ladder.filterMono(startSample, endSample, sampleIncrement);
 		}
-		else if ((hpfMode_ == FilterMode::SVF_BAND) || (hpfMode_ == FilterMode::SVF_NOTCH)) {
+		else if ((hpfMode_ == FilterMode::SVF_BAND) || (hpfMode_ == FilterMode::SVF_NOTCH)
+		         || (hpfMode_ == FilterMode::SVF_HP24)) {
 			hpfilter.svf.filterMono(startSample, endSample, sampleIncrement);
 		}
 	}
@@ -39,7 +40,8 @@ q31_t tempRenderBuffer[SSI_TX_BUFFER_NUM_SAMPLES * 2]; // * 2 to accomodate ster
 		if (hpfMode_ == FilterMode::HPLADDER) {
 			hpfilter.ladder.filterStereo(startSample, endSample);
 		}
-		else if ((hpfMode_ == FilterMode::SVF_BAND) || (hpfMode_ == FilterMode::SVF_NOTCH)) {
+		else if ((hpfMode_ == FilterMode::SVF_BAND) || (hpfMode_ == FilterMode::SVF_NOTCH)
+		         || (hpfMode_ == FilterMode::SVF_HP24)) {
 			hpfilter.svf.filterStereo(startSample, endSample);
 		}
 	}

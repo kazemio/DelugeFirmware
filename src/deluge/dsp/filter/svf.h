@@ -32,6 +32,8 @@ public:
 	void resetFilter() {
 		l = (SVFState){0, 0};
 		r = (SVFState){0, 0};
+		l2 = (SVFState){0, 0};
+		r2 = (SVFState){0, 0};
 	}
 
 private:
@@ -56,8 +58,13 @@ private:
 	void doFilterT(q31_t* startSample, q31_t* endSample, int32_t sampleIncrement);
 	template <bool kBand>
 	void doFilterStereoT(q31_t* startSample, q31_t* endSample);
+	void doFilterHP24(q31_t* startSample, q31_t* endSample, int32_t sampleIncrement);
+	void doFilterStereoHP24(q31_t* startSample, q31_t* endSample);
 	SVFState l;
 	SVFState r;
+	// second stage, used only in SVF_HP24 mode (two highpasses in series = 24dB/oct)
+	SVFState l2;
+	SVFState r2;
 
 	q31_t q;
 	q31_t in;
@@ -66,5 +73,6 @@ private:
 	q31_t c_notch;
 	q31_t c_high;
 	bool band_mode;
+	bool hp24_mode;
 };
 } // namespace deluge::dsp::filter

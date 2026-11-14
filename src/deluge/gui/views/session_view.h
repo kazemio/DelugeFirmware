@@ -26,6 +26,7 @@
 class Editor;
 class InstrumentClip;
 class AudioClip;
+class FXClip;
 class Clip;
 class ModelStack;
 class ModelStackWithTimelineCounter;
@@ -185,9 +186,11 @@ private:
 	void setCentralLEDStates();
 
 	Clip* createNewAudioClip(int32_t yDisplay);
+	Clip* createNewFXClip(int32_t yDisplay);
 	Clip* createNewInstrumentClip(OutputType outputType, int32_t yDisplay);
 
 	bool createNewTrackForAudioClip(AudioClip* newClip);
+	bool createNewTrackForFXClip(FXClip* newClip);
 	bool createNewTrackForInstrumentClip(OutputType type, InstrumentClip* clip, bool copyDrumsFromClip);
 
 	bool insertAndResyncNewClip(Clip* newClip, int32_t yDisplay);
@@ -251,6 +254,7 @@ private:
 	Clip* gridCloneClip(Clip* sourceClip);
 	Clip* gridCreateClipInTrack(Output* targetOutput);
 	AudioClip* gridCreateAudioClipWithNewTrack();
+	FXClip* gridCreateFXClipWithNewTrack();
 	InstrumentClip* gridCreateInstrumentClipWithNewTrack(OutputType type);
 	Clip* gridCreateClip(uint32_t targetSection, Output* targetOutput = nullptr, Clip* sourceClip = nullptr);
 	void gridClonePad(uint32_t sourceX, uint32_t sourceY, uint32_t targetX, uint32_t targetY);
