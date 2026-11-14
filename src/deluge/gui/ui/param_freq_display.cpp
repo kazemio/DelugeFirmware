@@ -27,6 +27,7 @@
 #include "model/mod_controllable/mod_controllable_audio.h"
 #include "model/settings/runtime_feature_settings.h"
 #include "model/song/song.h"
+#include "modulation/envelope.h"
 #include "modulation/sidechain/sidechain.h"
 #include "processing/sound/sound.h"
 #include "util/functions.h"
@@ -431,9 +432,30 @@ void appendUnitValue(float value, Unit unit, StringBuf& buf, Style style) {
 	}
 }
 
-void appendForParamValue(FreqParam which, float paramValue, StringBuf& buf, Style style) {
+// AHD envelopes reuse the decay param as their hold, which runs kAhdHoldSpeedup times faster than
+// a decay stage (modulation/envelope.cpp). Their release param is the decay, at the usual rate.
+float stageTimeScale(FreqParam which, params::Kind kind, int32_t paramID) {
+	if (which != FreqParam::ENV_DECAY || kind != params::Kind::PATCHED) {
+		return 1.0f;
+	}
+	// Patched envelope params only exist on Sounds, so the active ModControllable is a Sound
+	auto* sound = static_cast<Sound*>(view.activeModControllableModelStack.modControllable);
+	int32_t e = paramID - params::LOCAL_ENV_0_DECAY;
+	if (sound == nullptr || e < 0 || e >= kNumEnvelopes) {
+		return 1.0f;
+	}
+	if (sound->envelopeConfig[e].mode == deluge::modulation::EnvelopeMode::AHD) {
+		return 1.0f / (float)Envelope::kAhdHoldSpeedup;
+	}
+	return 1.0f;
+}
+
+void appendForParamValue(FreqParam which, float paramValue, StringBuf& buf, Style style, float timeScale = 1.0f) {
 	Unit unit;
 	float value = computeValue(which, paramValue, unit);
+	if (unit == Unit::SECONDS) {
+		value *= timeScale;
+	}
 	appendUnitValue(value, unit, buf, style);
 }
 
@@ -452,11 +474,13 @@ bool shouldShowHz(params::Kind kind, int32_t paramID) {
 }
 
 void appendHzForMenuValue(params::Kind kind, int32_t paramID, int32_t menuValue, StringBuf& buf, Style style) {
-	appendForParamValue(identify(kind, paramID), menuValueToParamValue(menuValue), buf, style);
+	FreqParam which = identify(kind, paramID);
+	appendForParamValue(which, menuValueToParamValue(menuValue), buf, style, stageTimeScale(which, kind, paramID));
 }
 
 void appendHzForKnobPos(params::Kind kind, int32_t paramID, int32_t knobPos, StringBuf& buf, Style style) {
-	appendForParamValue(identify(kind, paramID), (float)(knobPos - 64) * 33554432.0f, buf, style);
+	FreqParam which = identify(kind, paramID);
+	appendForParamValue(which, (float)(knobPos - 64) * 33554432.0f, buf, style, stageTimeScale(which, kind, paramID));
 }
 
 void appendShortSuffixForMenuValue(params::Kind kind, int32_t paramID, int32_t menuValue, StringBuf& buf) {
