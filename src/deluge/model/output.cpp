@@ -27,6 +27,7 @@
 #include "model/model_stack.h"
 #include "model/song/clip_iterators.h"
 #include "model/song/song.h"
+#include "modulation/macros/macros.h"
 #include "processing/engines/audio_engine.h"
 #include "storage/storage_manager.h"
 
@@ -274,6 +275,11 @@ bool Output::writeDataToFile(Serializer& writer, Clip* clipForSavingOutputOnly, 
 		if (usbBus_ != 0) {
 			writer.writeAttribute("usbBus", usbBus_);
 		}
+		// note-view MACRO mode - only write when engaged, to keep default/kit/audio files clean
+		if (macroKnobMode) {
+			writer.writeAttribute("macroKnobMode", 1);
+			writer.writeAttribute("macroKnobSelected", macroKnobSelected);
+		}
 
 		if (clipInstances.getNumElements()) {
 			writer.insertCommaIfNeeded();
@@ -353,6 +359,15 @@ bool Output::readTagFromFile(Deserializer& reader, char const* tagName) {
 	else if (!strcmp(tagName, "usbBus")) {
 		int32_t bus = reader.readTagOrAttributeValueInt();
 		usbBus_ = (bus >= 0 && bus <= deluge::usb_audio::kNumTrackBuses) ? bus : 0;
+	}
+
+	else if (!strcmp(tagName, "macroKnobMode")) {
+		macroKnobMode = reader.readTagOrAttributeValueInt() != 0;
+	}
+
+	else if (!strcmp(tagName, "macroKnobSelected")) {
+		int32_t selected = reader.readTagOrAttributeValueInt();
+		macroKnobSelected = (selected < 0) ? 0 : (selected >= Macros::kNumMacros ? Macros::kNumMacros - 1 : selected);
 	}
 
 	else if (!strcmp(tagName, "colour")) {

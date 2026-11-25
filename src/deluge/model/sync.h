@@ -39,6 +39,15 @@ enum SyncLevel syncValueToSyncLevel(int32_t option);
 
 enum SyncType syncValueToSyncType(int32_t value);
 
+/** Inverse of syncValueToSyncType/syncValueToSyncLevel: combined sync value 0..NUM_SYNC_VALUES-1. */
+int32_t syncTypeAndLevelToSyncValue(enum SyncType type, enum SyncLevel level);
+
+/** Conversions between an LFO sync param's full-range int32 value and the 0..NUM_SYNC_VALUES-1 sync value.
+ * Param values encode at bucket centers so the encode/decode pair round-trips exactly, and so an encoded
+ * sync value 0 (OFF) stays distinct from INT32_MIN, which UnpatchedParamSet treats as "never set". */
+int32_t lfoSyncParamValueToSyncValue(int32_t paramValue);
+int32_t lfoSyncValueToParamValue(int32_t syncValue);
+
 void syncValueToString(uint32_t value, StringBuf& buffer, int32_t tickMagnitude);
 void syncValueToStringForHorzMenuLabel(SyncType type, SyncLevel level, StringBuf& buffer, int32_t tickMagnitude);
 

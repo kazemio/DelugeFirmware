@@ -19,6 +19,7 @@
 #include "definitions_cxx.hpp"
 #include "drivers/usb/usb_audio.h"
 #include "dsp/reverb/reverb.hpp"
+#include "dsp/spectrum/spectrum_analyzer.h"
 #include "gui/l10n/l10n.h"
 #include "gui/ui/browser/browser.h"
 #include "gui/ui/load/load_instrument_preset_ui.h"
@@ -39,6 +40,7 @@
 #include "model/action/action_logger.h"
 #include "model/clip/audio_clip.h"
 #include "model/clip/clip_instance.h"
+#include "model/clip/fx_clip.h"
 #include "model/clip/instrument_clip.h"
 #include "model/consequence/consequence_clip_existence.h"
 #include "model/global_effectable/output_stage_gain.h"
@@ -62,6 +64,7 @@
 #include "processing/audio_output.h"
 #include "processing/engines/audio_engine.h"
 #include "processing/engines/cv_engine.h"
+#include "processing/fx_output.h"
 #include "processing/sound/sound_instrument.h"
 #include "processing/stem_export/stem_export.h"
 #include "storage/flash_storage.h"
@@ -124,8 +127,7 @@ Instrument* getCurrentInstrument() {
 	if (output == nullptr) {
 		return nullptr;
 	}
-	auto outputType = output->type;
-	if (outputType == OutputType::AUDIO || outputType == OutputType::NONE) {
+	if (!outputTypeIsInstrument(output->type)) {
 		return nullptr;
 	}
 
@@ -1024,7 +1026,7 @@ void Song::setClipLength(Clip* clip, uint32_t newLength, Action* action, bool ma
 	}
 }
 
-void Song::doubleClipLength(InstrumentClip* clip, Action* action) {
+void Song::doubleClipLength(Clip* clip, Action* action) {
 
 	char modelStackMemory[MODEL_STACK_MAX_SIZE];
 	ModelStackWithTimelineCounter* modelStack =
@@ -2017,6 +2019,16 @@ unknownTag:
 						goto loadOutput;
 					}
 
+					else if (!strcmp(tagName, "fxTrack")) {
+						memory = GeneralMemoryAllocator::get().allocMaxSpeed(sizeof(FXOutput));
+						if (!memory) {
+							return Error::INSUFFICIENT_RAM;
+						}
+						newOutput = new (memory) FXOutput(*this);
+						reader.match('{');
+						goto loadOutput;
+					}
+
 					else if (!strcmp(tagName, "sound")) {
 						memory = GeneralMemoryAllocator::get().allocMaxSpeed(sizeof(SoundInstrument));
 						if (!memory) {
@@ -2043,7 +2055,7 @@ loadOutput:
 						if (error != Error::NONE) {
 							goto gotError;
 						}
-						if (newOutput->type != OutputType::AUDIO) {
+						if (outputTypeIsInstrument(newOutput->type)) {
 							static_cast<Instrument*>(newOutput)->mightExistOnCard = true;
 						}
 						*lastPointer = newOutput;
@@ -2389,6 +2401,9 @@ readClip:
 			if (clipType == ClipType::INSTRUMENT) {
 				newClip = new (memory) InstrumentClip();
 			}
+			else if (clipType == ClipType::FX) {
+				newClip = new (memory) FXClip();
+			}
 			else {
 				newClip = new (memory) AudioClip();
 			}
@@ -2408,6 +2423,12 @@ readClip:
 		else if (!strcmp(tagName, "audioClip")) {
 			allocationSize = sizeof(AudioClip);
 			clipType = ClipType::AUDIO;
+
+			goto readClip;
+		}
+		else if (!strcmp(tagName, "fxClip")) {
+			allocationSize = sizeof(FXClip);
+			clipType = ClipType::FX;
 
 			goto readClip;
 		}
@@ -2509,11 +2530,14 @@ void Song::deleteSoundsWhichWontSound() {
 
 void Song::renderAudio(std::span<StereoSample> outputBuffer, int32_t* reverbBuffer, int32_t sideChainHitPending) {
 
+	// If an FXClip is active, its ParamManager drives the whole master FX chain in place of the Song's own
+	ParamManagerForTimeline* masterParamManager = getActiveMasterParamManager();
+
 	// int32_t volumePostFX = getParamNeutralValue(params::GLOBAL_VOLUME_POST_FX);
 	int32_t volumePostFX =
 	    getFinalParameterValueVolume(
 	        134217728,
-	        cableToLinearParamShortcut(paramManager.getUnpatchedParamSet()->getValue(params::UNPATCHED_VOLUME)))
+	        cableToLinearParamShortcut(masterParamManager->getUnpatchedParamSet()->getValue(params::UNPATCHED_VOLUME)))
 	    >> kSongVolumeAdjustmentShift;
 
 	// A "post-FX volume" calculation also happens in audioDriver.render(), which is a bit more relevant really
@@ -2567,32 +2591,47 @@ void Song::renderAudio(std::span<StereoSample> outputBuffer, int32_t* reverbBuff
 	}
 	AudioEngine::logAction("done recorders");
 
-	Delay::State delayWorkingState = globalEffectable.createDelayWorkingState(paramManager);
+	Delay::State delayWorkingState = globalEffectable.createDelayWorkingState(*masterParamManager);
 
 	int32_t postReverbVolume = paramNeutralValues[params::GLOBAL_VOLUME_POST_REVERB_SEND];
 	int32_t reverbSendAmount =
 	    getFinalParameterValueVolume(paramNeutralValues[params::GLOBAL_REVERB_AMOUNT],
-	                                 cableToLinearParamShortcut(paramManager.getUnpatchedParamSet()->getValue(
+	                                 cableToLinearParamShortcut(masterParamManager->getUnpatchedParamSet()->getValue(
 	                                     params::UNPATCHED_REVERB_SEND_AMOUNT)));
 
 	// don't bother checking if sound is coming in - its just to save resources and if nothing is being rendered we
 	// don't need to
-	globalEffectable.processFXForGlobalEffectable(outputBuffer, &volumePostFX, &paramManager, delayWorkingState, true,
-	                                              reverbSendAmount >> 3);
+	globalEffectable.processFXForGlobalEffectable(outputBuffer, &volumePostFX, masterParamManager, delayWorkingState,
+	                                              true, reverbSendAmount >> 3);
 
 	globalEffectable.processReverbSendAndVolume(outputBuffer, reverbBuffer, volumePostFX, postReverbVolume,
 	                                            reverbSendAmount >> 1);
 	AudioEngine::logAction("done global effectables");
 
-	if (playbackHandler.isEitherClockActive() && !playbackHandler.ticksLeftInCountIn
-	    && currentPlaybackMode == &arrangement) {
-		const bool result = params::kMaxNumUnpatchedParams > 32
-		                        ? paramManager.getUnpatchedParamSetSummary()->whichParamsAreInterpolating[0]
-		                              || paramManager.getUnpatchedParamSetSummary()->whichParamsAreInterpolating[1]
-		                        : paramManager.getUnpatchedParamSetSummary()->whichParamsAreInterpolating[0];
-		if (result) {
-			ModelStackWithThreeMainThings* modelStackWithThreeMainThings = addToModelStack(modelStack);
-			paramManager.tickSamples(outputBuffer.size(), modelStackWithThreeMainThings);
+	spectrumAnalyzer.maybeFeed(&globalEffectable, outputBuffer);
+
+	if (playbackHandler.isEitherClockActive() && !playbackHandler.ticksLeftInCountIn) {
+		// The Song's own paramManager only interpolates during arrangement playback (arranger master automation). An
+		// active FXClip's paramManager interpolates in session mode too - that's where its clips mostly play.
+		bool masterParamManagerIsSongs = (masterParamManager == &paramManager);
+		if (!masterParamManagerIsSongs || currentPlaybackMode == &arrangement) {
+			const bool result =
+			    params::kMaxNumUnpatchedParams > 32
+			        ? masterParamManager->getUnpatchedParamSetSummary()->whichParamsAreInterpolating[0]
+			              || masterParamManager->getUnpatchedParamSetSummary()->whichParamsAreInterpolating[1]
+			        : masterParamManager->getUnpatchedParamSetSummary()->whichParamsAreInterpolating[0];
+			if (result) {
+				ModelStackWithThreeMainThings* modelStackWithThreeMainThings;
+				if (masterParamManagerIsSongs) {
+					modelStackWithThreeMainThings = addToModelStack(modelStack);
+				}
+				else {
+					modelStackWithThreeMainThings =
+					    modelStack->addTimelineCounter(getFXOutput()->getActiveClip())
+					        ->addOtherTwoThingsButNoNoteRow(&globalEffectable, masterParamManager);
+				}
+				masterParamManager->tickSamples(outputBuffer.size(), modelStackWithThreeMainThings);
+			}
 		}
 	}
 	AudioEngine::logAction("done render");
@@ -3607,7 +3646,8 @@ traverseClips:
 // NOTE: for Instruments not currently in any list
 void Song::deleteOrAddToHibernationListOutput(Output* output) {
 	// If un-edited (which will include all CV Instruments, and any MIDI without mod knob assignments)
-	if (output->type == OutputType::AUDIO || output->type == OutputType::CV || !((Instrument*)output)->editedByUser) {
+	if (!outputTypeIsInstrument(output->type) || output->type == OutputType::CV
+	    || !((Instrument*)output)->editedByUser) {
 		output->prepareForHibernationOrDeletion();
 		deleteOutput(output);
 	}
@@ -3624,7 +3664,7 @@ void Song::deleteOrAddToHibernationListOutput(Output* output) {
 // NOTE: for Instruments currently in the main list
 void Song::deleteOrHibernateOutput(Output* output) {
 	// If edited (which won't include any CV Instruments), just hibernate it. Only allowed for audio Instruments
-	if (output->type != OutputType::CV && output->type != OutputType::AUDIO) {
+	if (output->type != OutputType::CV && outputTypeIsInstrument(output->type)) {
 		Instrument* instrument = (Instrument*)output;
 		if (!instrument->editedByUser) {
 			goto deleteIt;
@@ -3754,7 +3794,7 @@ void Song::deleteHibernatingInstrumentWithSlot(OutputType outputType, char const
 
 void Song::markAllInstrumentsAsEdited() {
 	for (Output* output = firstOutput; output; output = output->next) {
-		if (output->type == OutputType::AUDIO) {
+		if (!outputTypeIsInstrument(output->type)) {
 			continue;
 		}
 
@@ -4874,7 +4914,7 @@ bool Song::shouldOldOutputBeReplaced(Clip* clip, Availability* availabilityRequi
 }
 
 Output* Song::navigateThroughPresetsForInstrument(Output* output, int32_t offset, Clip* displayClip) {
-	if (output->type == OutputType::AUDIO) {
+	if (!outputTypeIsInstrument(output->type)) {
 		return output;
 	}
 
@@ -5270,6 +5310,56 @@ AudioOutput* Song::createNewAudioOutput(Output* replaceOutput) {
 		addOutput(newOutput);
 	}
 	return newOutput;
+}
+
+FXOutput* Song::getFXOutput() {
+	for (Output* output = firstOutput; output; output = output->next) {
+		if (output->type == OutputType::AUDIO_FX) {
+			return (FXOutput*)output;
+		}
+	}
+	return nullptr;
+}
+
+// Only one FXOutput may exist per Song - returns the existing one if already present
+FXOutput* Song::createNewFXOutput() {
+	FXOutput* existing = getFXOutput();
+	if (existing) {
+		return existing;
+	}
+
+	ParamManagerForTimeline newParamManager;
+	Error error = newParamManager.setupUnpatched();
+	if (error != Error::NONE) {
+		return nullptr;
+	}
+
+	void* outputMemory = GeneralMemoryAllocator::get().allocMaxSpeed(sizeof(FXOutput));
+	if (!outputMemory) {
+		return nullptr;
+	}
+
+	auto* newOutput = new (outputMemory) FXOutput(*this);
+	newOutput->name.set("FX");
+
+	// Same init as the Song's own master params, so a fresh FXClip's takeover is value-identical to the song defaults
+	GlobalEffectable::initParams(&newParamManager);
+
+	backUpParamManager((ModControllableAudio*)newOutput->toModControllable(), nullptr, &newParamManager, true);
+
+	addOutput(newOutput);
+	return newOutput;
+}
+
+ParamManagerForTimeline* Song::getActiveMasterParamManager() {
+	Output* fxOutput = getFXOutput();
+	if (fxOutput) {
+		Clip* fxClip = fxOutput->getActiveClip();
+		if (fxClip && isClipActive(fxClip)) {
+			return &fxClip->paramManager;
+		}
+	}
+	return &paramManager;
 }
 
 Output* Song::getNextAudioOutput(int32_t offset, Output* oldOutput, Availability availabilityRequirement) {
@@ -5899,7 +5989,7 @@ TimelineCounter* Song::getTimelineCounterToRecordTo() {
 
 void Song::setDefaultVelocityForAllInstruments(uint8_t newDefaultVelocity) {
 	for (Output* output = firstOutput; output; output = output->next) {
-		if (output->type != OutputType::AUDIO) {
+		if (outputTypeIsInstrument(output->type)) {
 			((Instrument*)output)->defaultVelocity = newDefaultVelocity;
 		}
 	}

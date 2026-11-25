@@ -31,8 +31,15 @@ namespace deluge::dsp::filter {
 //  - Skipping the c_high multiply-accumulate when morph is 0 (c_high == 0 adds exactly 0 with smmlar). Bit-exact, but
 //    one instruction per sample for another set of variants; not done.
 //  - One tanh per sample instead of two. Changes the sound; not done.
+// Each doSVF pass multiplies by 1.5 to match ladder loudness; the cascade would come out 2.25x,
+// so trim its output by 2/3 to land back on the single-stage 1.5x.
+constexpr q31_t kTwoThirds = (q31_t)(ONE_Q31 * 2.0 / 3.0);
+
 [[gnu::hot]] void SVFilter::doFilter(q31_t* startSample, q31_t* endSample, int32_t sampleIncrement) {
-	if (band_mode) {
+	if (hp24_mode) {
+		doFilterHP24(startSample, endSample, sampleIncrement);
+	}
+	else if (band_mode) {
 		doFilterT<true>(startSample, endSample, sampleIncrement);
 	}
 	else {
@@ -40,12 +47,49 @@ namespace deluge::dsp::filter {
 	}
 }
 [[gnu::hot]] void SVFilter::doFilterStereo(q31_t* startSample, q31_t* endSample) {
-	if (band_mode) {
+	if (hp24_mode) {
+		doFilterStereoHP24(startSample, endSample);
+	}
+	else if (band_mode) {
 		doFilterStereoT<true>(startSample, endSample);
 	}
 	else {
 		doFilterStereoT<false>(startSample, endSample);
 	}
+}
+// SVF_HP24: two highpass stages in series (24dB/oct). Kept in its own loops so the single-stage paths stay as they
+// are. band_mode is never set together with hp24_mode.
+[[gnu::hot]] void SVFilter::doFilterHP24(q31_t* startSample, q31_t* endSample, int32_t sampleIncrement) {
+	const Coeffs c = getCoeffs();
+	SVFState s = l;
+	SVFState s2 = l2;
+	q31_t* currentSample = startSample;
+	do {
+		q31_t outs = doSVF<false>(*currentSample, s, c);
+		*currentSample = 2 * multiply_32x32_rshift32(doSVF<false>(outs, s2, c), kTwoThirds);
+		currentSample += sampleIncrement;
+	} while (currentSample < endSample);
+	l = s;
+	l2 = s2;
+}
+[[gnu::hot]] void SVFilter::doFilterStereoHP24(q31_t* startSample, q31_t* endSample) {
+	const Coeffs c = getCoeffs();
+	SVFState sl = l;
+	SVFState sr = r;
+	SVFState sl2 = l2;
+	SVFState sr2 = r2;
+	q31_t* currentSample = startSample;
+	do {
+		q31_t outs = doSVF<false>(currentSample[0], sl, c);
+		q31_t outs2 = doSVF<false>(currentSample[1], sr, c);
+		currentSample[0] = 2 * multiply_32x32_rshift32(doSVF<false>(outs, sl2, c), kTwoThirds);
+		currentSample[1] = 2 * multiply_32x32_rshift32(doSVF<false>(outs2, sr2, c), kTwoThirds);
+		currentSample += 2;
+	} while (currentSample < endSample);
+	l = sl;
+	r = sr;
+	l2 = sl2;
+	r2 = sr2;
 }
 template <bool kBand>
 [[gnu::hot]] void SVFilter::doFilterT(q31_t* startSample, q31_t* endSample, int32_t sampleIncrement) {
@@ -81,6 +125,7 @@ q31_t SVFilter::setConfig(q31_t freq, q31_t res, FilterMode lpfMode, q31_t lpfMo
 	fc = fc + multiply_32x32_rshift32(fc, POINT_25);
 
 	band_mode = (lpfMode == FilterMode::SVF_BAND);
+	hp24_mode = (lpfMode == FilterMode::SVF_HP24);
 	// raw resonance is 0 - 536870896 (2^28ish, don't know where it comes from)
 	// Multiply by 4 to bring it to the q31 0-1 range
 	q = (ONE_Q31 - 4 * (res));
@@ -92,7 +137,13 @@ q31_t SVFilter::setConfig(q31_t freq, q31_t res, FilterMode lpfMode, q31_t lpfMo
 	// note - the if statements are to avoid overflow issues
 	// do not remove
 	constexpr q31_t ONE_HALF = ONE_Q31 >> 1;
-	if (band_mode) {
+	if (hp24_mode) {
+		// pure highpass through both stages; morph unused
+		c_low = 0;
+		c_band = 0;
+		c_high = ONE_Q31;
+	}
+	else if (band_mode) {
 		if (lpfMorph > (ONE_HALF)) {
 			lpfMorph = 2 * (lpfMorph - (ONE_HALF));
 			c_low = 0;

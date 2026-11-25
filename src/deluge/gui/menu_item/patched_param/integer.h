@@ -18,6 +18,7 @@
 #include "definitions_cxx.hpp"
 #include "gui/menu_item/integer.h"
 #include "gui/menu_item/patched_param.h"
+#include "gui/ui/param_freq_display.h"
 
 namespace deluge::gui::menu_item::patched_param {
 class Integer : public PatchedParam, public menu_item::IntegerContinuous {
@@ -31,6 +32,19 @@ public:
 	    : PatchedParam(newP), IntegerContinuous(newName, title), number_style_{style} {}
 	// 7SEG Only
 	void drawValue() override { display->setTextAsNumber(this->getValue(), shouldDrawDotOnName()); }
+
+	// Adds the real-world unit reading (Hz / ms) under the value for convertible params, when the
+	// ShowRealUnits community feature is on. No-op for everything else.
+	void drawPixelsForOled() override {
+		IntegerContinuous::drawPixelsForOled();
+		param_freq_display::drawMenuHzLine(getParamKind(), getP(), this->getValue());
+	}
+
+	// Same reading appended to the horizontal-menu value banner, e.g. "35 (2.7k)"
+	void getNotificationValue(StringBuf& value) override {
+		IntegerContinuous::getNotificationValue(value);
+		param_freq_display::appendShortSuffixForMenuValue(getParamKind(), getP(), this->getValue(), value);
+	}
 
 	bool usesAffectEntire() override { return true; }
 
